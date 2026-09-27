@@ -20,7 +20,7 @@ front view, plain bg      Meshy free tier          clips (FBX)           tiny re
    at 32–64 px.
 3. **Rig and animate.** Mixamo auto-rig for humanoids. Tick *In Place*. Rigify or a manual rig
    for non-humanoids.
-4. **Render.** A scripted Blender run (`blender -b file.blend -P render.py`) renders every
+4. **Render.** `pixelcraft render` (a scripted, headless Blender run) renders every
    animation × direction × frame.
 5. **Cleanup.** See [doc 05](05-pixel-postprocessing.md). Use one palette across every frame of
    a character.

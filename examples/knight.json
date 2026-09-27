@@ -1,0 +1,19 @@
+{
+  "model": "knight.blend",
+  "output": "../out/knight",
+  "render": {
+    "height": 48,
+    "directions": 8,
+    "pitch": 30,
+    "frame_step": 2
+  },
+  "shade": {
+    "light": [-0.5, 0.55, 0.65]
+  },
+  "palette": {
+    "max_colors": 20
+  },
+  "outline": {
+    "mode": "outer"
+  }
+}

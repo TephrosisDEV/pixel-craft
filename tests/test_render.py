@@ -1,0 +1,33 @@
+"""End-to-end render of the example knight. Needs the bpy module (pip install bpy) in the test environment."""
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import numpy as np
+import pytest
+from PIL import Image
+
+pytest.importorskip("bpy")
+
+ROOT = Path(__file__).resolve().parents[1]
+KNIGHT_COLOURS = {(224, 176, 138), (138, 149, 168), (156, 47, 58), (46, 49, 64), (91, 58, 41), (214, 221, 230), (201, 161, 59)}
+
+
+def test_render_gives_flat_hard_edged_frames_for_each_direction(tmp_path):
+    subprocess.run([sys.executable, str(ROOT / "examples" / "make_test_knight.py"), str(tmp_path / "knight.blend")], check=True)
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"model": "knight.blend", "output": "out", "render": {"height": 48, "directions": 8, "frame_step": 2}}))
+    subprocess.run([sys.executable, str(ROOT / "pixelcraft" / "render_blender.py"), str(config)], check=True)
+
+    render = tmp_path / "out" / "render"
+    manifest = json.loads((render / "manifest.json").read_text())
+    assert [d["name"] for d in manifest["directions"]] == ["s", "se", "e", "ne", "n", "nw", "w", "sw"]
+    assert {a["name"] for a in manifest["actions"]} == {"idle", "walk", "attack"}
+
+    for path in render.glob("*/*/*_albedo.png"):
+        frame = np.array(Image.open(path))
+        assert list(frame.shape[1::-1]) == manifest["canvas"]
+        assert set(np.unique(frame[..., 3])) <= {0, 255}
+        assert {tuple(int(v) for v in c) for c in frame[frame[..., 3] > 0][:, :3]} <= KNIGHT_COLOURS
