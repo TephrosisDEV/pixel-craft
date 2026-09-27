@@ -8,7 +8,7 @@ from PIL import Image
 
 from . import palette as palettes
 from .color import hex_to_rgb, to_uint8
-from .shade import outline, toon
+from .shade import despeckle, outline, toon
 from .sheet import aseprite_json, pack, preview_gif
 
 DEFAULTS = {
@@ -21,6 +21,7 @@ DEFAULTS = {
         ],
     },
     "palette": {"max_colors": 24, "file": None},
+    "cleanup": {"despeckle": False},
     "outline": {"mode": "outer", "color": "auto"},
     "preview": {"scale": 4, "background": "#22222a"},
 }
@@ -54,9 +55,10 @@ def process(config_path: Path) -> str:
         else palettes.build(np.concatenate([f[f[..., 3] > 0][:, :3] for frames in shaded.values() for f in frames]),
                             opts["palette"]["max_colors"])
     )
+    clean = despeckle if opts["cleanup"]["despeckle"] else (lambda frame: frame)
     line_colour = palettes.darkest(colours) if opts["outline"]["color"] == "auto" else to_uint8(hex_to_rgb(opts["outline"]["color"]))
     final = {
-        name: [outline(palettes.apply(frame, colours), opts["outline"]["mode"], line_colour) for frame in frames]
+        name: [outline(clean(palettes.apply(frame, colours)), opts["outline"]["mode"], line_colour) for frame in frames]
         for name, frames in shaded.items()
     }
 

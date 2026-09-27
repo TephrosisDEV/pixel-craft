@@ -53,7 +53,7 @@ def main():
     if not meshes:
         sys.exit("render: no mesh objects in the scene")
 
-    actions = collect_actions(armature, config.get("animations"), opts["frame_step"])
+    actions = collect_actions(armature, config.get("actions") or list(config.get("animations", {})), opts["frame_step"])
     directions = direction_list(opts["directions"], opts["start_angle"])
     pitch = min(max(float(opts["pitch"]), 0.0), 89.0)
 
@@ -152,6 +152,8 @@ def assign_action(armature, action):
     if action["action"] is None:
         return
     data = armature.animation_data or armature.animation_data_create()
+    for track in data.nla_tracks:
+        track.mute = True
     data.action = action["action"]
     if hasattr(data, "action_slot") and data.action_slot is None and len(action["action"].slots):
         data.action_slot = action["action"].slots[0]

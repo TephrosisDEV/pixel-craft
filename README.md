@@ -68,6 +68,7 @@ Paths are relative to the config file. Everything except `model` and `output` is
     ]
   },
   "palette": {"max_colors": 24, "file": null},   // or a .hex, .gpl or image palette to force
+  "cleanup": {"despeckle": false},              // recolour isolated pixels: helps detailed textures, eats 1px eyes
   "outline": {"mode": "outer", "color": "auto"}, // outer | inner | none; auto = darkest palette colour
   "preview": {"scale": 4, "background": "#22222a"}
 }

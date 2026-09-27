@@ -1,7 +1,7 @@
 import numpy as np
 
 from pixelcraft import palette
-from pixelcraft.shade import outline, toon
+from pixelcraft.shade import despeckle, outline, toon
 from pixelcraft.sheet import aseprite_json
 
 BANDS = [
@@ -67,3 +67,14 @@ def test_aseprite_json_lays_out_one_row_per_strip():
     assert data["frames"][4]["frame"] == {"x": 10, "y": 20, "w": 10, "h": 20}
     assert data["frames"][0]["duration"] == 100
     assert data["meta"]["size"] == {"w": 30, "h": 40}
+
+
+def test_despeckle_recolours_isolated_pixels_only():
+    image = np.zeros((4, 5, 4), dtype=np.uint8)
+    image[:, :] = [10, 10, 10, 255]
+    image[1, 1] = [200, 0, 0, 255]
+    image[1:3, 3] = [0, 200, 0, 255]
+    cleaned = despeckle(image)
+    assert cleaned[1, 1].tolist() == [10, 10, 10, 255]
+    assert cleaned[1, 3].tolist() == [0, 200, 0, 255]
+    assert cleaned[2, 3].tolist() == [0, 200, 0, 255]

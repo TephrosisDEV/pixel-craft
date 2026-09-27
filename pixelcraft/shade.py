@@ -47,3 +47,22 @@ def outline(image: np.ndarray, mode: str, colour: np.ndarray) -> np.ndarray:
     result = image.copy()
     result[ring] = [*colour, 255]
     return result
+
+
+def despeckle(image: np.ndarray) -> np.ndarray:
+    """Recolour opaque pixels that share their colour with none of their 8 neighbours.
+
+    Each one takes the most common colour among its opaque neighbours. This removes the noise
+    detailed textures leave at sprite size, but also 1px details such as eyes.
+    """
+    ids = np.where(image[..., 3] > 0, image[..., 0].astype(np.int64) << 16 | image[..., 1].astype(np.int64) << 8 | image[..., 2], -1)
+    padded = np.pad(ids, 1, constant_values=-1)
+    height, width = ids.shape
+    neighbours = np.stack([padded[1 + dy:1 + dy + height, 1 + dx:1 + dx + width]
+                           for dy in (-1, 0, 1) for dx in (-1, 0, 1) if dy or dx])
+    votes = np.stack([np.where(candidate >= 0, (neighbours == candidate).sum(0), 0) for candidate in neighbours])
+    majority = np.take_along_axis(neighbours, votes.argmax(0)[None], 0)[0]
+    speckle = (ids >= 0) & ((neighbours == ids).sum(0) == 0) & (majority >= 0)
+    result = image.copy()
+    result[speckle, 0], result[speckle, 1], result[speckle, 2] = majority[speckle] >> 16, majority[speckle] >> 8 & 255, majority[speckle] & 255
+    return result
