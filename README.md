@@ -59,7 +59,10 @@ Paths are relative to the config file. Everything except `model` and `output` is
     "pitch": 30,           // camera elevation: 0 = side-on, 30-45 = top-down RPG
     "front_axis": "auto",  // which way the model faces: auto-detected on humanoid rigs, else -Y/+Y/+X/-X
     "frame_step": 2,       // render every Nth frame (30 fps source, 2 -> 15 fps)
-    "padding": 2           // empty pixels around the sprite
+    "padding": 2,          // empty pixels around the sprite
+    "strip_ground": true,  // remove mesh pieces lying flat at the feet (image-to-3D ground shadows)
+    "texture_colors": "srgb", // "linear" for exports whose textures come out far too dark (TRELLIS.2)
+    "keep_posture": false  // keep the model's own hunch/lean when retargeting upright animations
   },
   "shade": {
     "light": [-0.5, 0.55, 0.65],        // towards the light, in screen space: x right, y up, z to viewer

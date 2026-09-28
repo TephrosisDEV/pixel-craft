@@ -54,3 +54,22 @@ def test_retargeting_an_animation_onto_its_own_rig_reproduces_it(tmp_path):
         overlaps.append((a & b).sum() / (a | b).sum())
     assert len(overlaps) == 4 * 16
     assert min(overlaps) > 0.97
+
+
+def test_ground_sheet_under_the_feet_is_stripped(tmp_path):
+    subprocess.run([sys.executable, str(ROOT / "examples" / "make_test_knight.py"), str(tmp_path / "knight.blend")], check=True)
+    add_ground = (
+        "import bpy, sys; bpy.ops.wm.open_mainfile(filepath=sys.argv[1]); "
+        "bpy.ops.mesh.primitive_plane_add(size=4, location=(0, 0, 0.01)); "
+        "bpy.ops.wm.save_as_mainfile(filepath=sys.argv[2])"
+    )
+    subprocess.run([sys.executable, "-c", add_ground, str(tmp_path / "knight.blend"), str(tmp_path / "grounded.blend")], check=True)
+
+    canvases = []
+    for model in ("knight.blend", "grounded.blend"):
+        config = tmp_path / f"{model}.json"
+        config.write_text(json.dumps({"model": model, "actions": ["idle"], "output": f"out_{model}",
+                                      "render": {"height": 32, "directions": 2, "frame_step": 8}}))
+        subprocess.run([sys.executable, str(ROOT / "pixelcraft" / "render_blender.py"), str(config)], check=True)
+        canvases.append(json.loads((tmp_path / f"out_{model}" / "render" / "manifest.json").read_text())["canvas"])
+    assert canvases[0] == canvases[1]

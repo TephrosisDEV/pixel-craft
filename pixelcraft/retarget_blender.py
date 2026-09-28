@@ -45,6 +45,7 @@ LIMB_CHILDREN = {
     "neck": ["head"],
 }
 LEAF_PARENT = {"head": "neck"}
+POSTURE = {"hips", "spine", "spine1", "spine2", "neck", "head"}
 for side in ("left", "right"):
     LIMB_CHILDREN.update({
         f"{side}shoulder": [f"{side}arm"], f"{side}arm": [f"{side}forearm"], f"{side}forearm": [f"{side}hand"],
@@ -78,8 +79,12 @@ def facing(armature) -> Vector:
     return forward.normalized()
 
 
-def retarget(source, action, target, name):
-    """Bake `action` (played on armature `source`) onto `target` as a new action called `name`."""
+def retarget(source, action, target, name, keep_posture=False):
+    """Bake `action` (played on armature `source`) onto `target` as a new action called `name`.
+
+    With `keep_posture`, the target's torso and head keep their own rest pose (a hunch, a lean)
+    instead of being straightened onto the source's; limbs are still aligned.
+    """
     source_roles, target_roles = roles(source), roles(target)
     shared = [role for role in ROLES if role in source_roles and role in target_roles]
     scene = bpy.context.scene
@@ -95,6 +100,9 @@ def retarget(source, action, target, name):
     corrections = {}
     for role in shared:
         child = next((c for c in LIMB_CHILDREN.get(role, []) if c in shared), None)
+        if keep_posture and role in POSTURE:
+            corrections[role] = Quaternion()
+            continue
         if child is None:
             corrections[role] = corrections.get(LEAF_PARENT.get(role), Quaternion())
             continue

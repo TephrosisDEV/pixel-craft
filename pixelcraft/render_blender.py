@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 import bpy
+import bmesh  # noqa: I001  (only importable once bpy is loaded)
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -39,6 +40,9 @@ DEFAULTS = {
     "front_axis": "auto",
     "frame_step": 2,
     "padding": 2,
+    "texture_colors": "srgb",
+    "keep_posture": False,
+    "strip_ground": True,
 }
 
 
@@ -50,13 +54,15 @@ def main():
     opts = {**DEFAULTS, **config.get("render", {})}
     out_dir = (base / config["output"] / "render").resolve()
 
-    load_scene(base / config["model"], {
+    load_scene(base / config["model"], opts["keep_posture"], {
         name: (base / path.split("#")[0], path.split("#")[1] if "#" in path else None)
         for name, path in config.get("animations", {}).items()
     })
     scene = bpy.context.scene
     armature = next((o for o in scene.objects if o.type == "ARMATURE"), None)
     meshes = [o for o in scene.objects if o.type == "MESH" and not o.hide_render]
+    if opts["strip_ground"]:
+        strip_ground(meshes)
     if not meshes:
         sys.exit("render: no mesh objects in the scene")
 
@@ -66,7 +72,7 @@ def main():
 
     camera = setup_camera(scene)
     setup_render(scene)
-    albedo_materials(meshes)
+    albedo_materials(meshes, opts["texture_colors"] == "linear")
     normal_material = make_normal_material()
 
     unit = world_height(scene, armature, meshes, actions) / opts["height"]
@@ -107,12 +113,12 @@ def main():
     print(f"render: {len(actions)} actions x {len(directions)} directions, canvas {width}x{height} -> {out_dir}")
 
 
-def load_scene(model_path, animations):
+def load_scene(model_path, keep_posture, animations):
     """Open or import the model, then bring in each animation as an action named after its key.
 
     `animations` maps name -> (file, action name or None for the file's first action). Humanoid
-    animations are retargeted onto the model's skeleton; anything else is assumed to already
-    use the model's own skeleton.
+    animations are retargeted onto the model's skeleton (keeping the model's own spine and head
+    posture when `keep_posture` is set); anything else is assumed to already use the model's skeleton.
     """
     if model_path.suffix == ".blend":
         bpy.ops.wm.open_mainfile(filepath=str(model_path))
@@ -132,7 +138,7 @@ def load_scene(model_path, animations):
             sys.exit(f"render: no animation {wanted or ''} in {path}".replace("  ", " "))
         source = next((o for o in set(bpy.data.objects) - before_objects if o.type == "ARMATURE"), None)
         if target is not None and source is not None and is_humanoid(source) and is_humanoid(target):
-            kept = retarget(source, action, target, name)
+            kept = retarget(source, action, target, name, keep_posture)
         else:
             kept = action
             kept.use_fake_user = True
@@ -144,6 +150,40 @@ def load_scene(model_path, animations):
         if name in bpy.data.actions and bpy.data.actions[name] is not kept:
             bpy.data.actions[name].name = f"{name}.model"
         kept.name = name
+
+
+def strip_ground(meshes):
+    """Delete mesh islands lying entirely in the bottom 4% of the model.
+
+    Image-to-3D models turn a concept's ground shadow into a sheet under the feet, often split
+    into many fragments. Feet reach higher than that band, so they survive.
+    """
+    zs = [(o.matrix_world @ v.co).z for o in meshes for v in o.data.vertices]
+    floor, height = min(zs), max(zs) - min(zs)
+    for obj in meshes:
+        mesh = bmesh.new()
+        mesh.from_mesh(obj.data)
+        seen, doomed = set(), []
+        for start in mesh.verts:
+            if start in seen:
+                continue
+            island, stack = [], [start]
+            seen.add(start)
+            while stack:
+                vert = stack.pop()
+                island.append(vert)
+                for edge in vert.link_edges:
+                    other = edge.other_vert(vert)
+                    if other not in seen:
+                        seen.add(other)
+                        stack.append(other)
+            if max((obj.matrix_world @ v.co).z for v in island) < floor + 0.04 * height:
+                doomed.extend(island)
+        if doomed:
+            bmesh.ops.delete(mesh, geom=doomed, context="VERTS")
+            mesh.to_mesh(obj.data)
+            print(f"render: stripped {len(doomed)} ground vertices from {obj.name}")
+        mesh.free()
 
 
 def import_file(path):
@@ -302,8 +342,12 @@ def render_to(scene, path):
     bpy.ops.render.render(write_still=True)
 
 
-def albedo_materials(meshes):
-    """Rewire every material to emit its flat base colour, with nearest-neighbour texture sampling."""
+def albedo_materials(meshes, linear_textures=False):
+    """Rewire every material to emit its flat base colour, with nearest-neighbour texture sampling.
+
+    `linear_textures` reads colour textures as linear values, for exporters that write linear
+    colour into files tagged sRGB (TRELLIS.2's GLBs come out far too dark otherwise).
+    """
     for material in {slot.material for obj in meshes for slot in obj.material_slots if slot.material}:
         if not material.use_nodes:
             colour = material.diffuse_color
@@ -315,6 +359,8 @@ def albedo_materials(meshes):
         for node in material.node_tree.nodes:
             if node.type == "TEX_IMAGE":
                 node.interpolation = "Closest"
+                if linear_textures and node.image is not None and node.image.colorspace_settings.name == "sRGB":
+                    node.image.colorspace_settings.name = "Non-Color"
         shader = next((n for n in material.node_tree.nodes if n.type in ("BSDF_PRINCIPLED", "BSDF_DIFFUSE")), None)
         if shader is None:
             continue
