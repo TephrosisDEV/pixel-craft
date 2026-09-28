@@ -7,7 +7,7 @@ import numpy as np
 from .color import hex_to_rgb, linear_to_srgb, srgb_to_linear, srgb_to_oklab, to_uint8
 
 
-def toon(albedo: np.ndarray, normal: np.ndarray, light: list[float], bands: list[dict]) -> np.ndarray:
+def toon(albedo: np.ndarray, normal: np.ndarray, light: list[float], bands: list[dict], normal_blur: int = 0) -> np.ndarray:
     """Shade RGBA albedo with hard light bands.
 
     `normal` is the encoded camera-space normal pass. `light` points from the surface towards
@@ -16,6 +16,16 @@ def toon(albedo: np.ndarray, normal: np.ndarray, light: list[float], bands: list
     threshold its lambert term reaches, and its linear albedo is multiplied by that colour.
     """
     n = normal[..., :3].astype(np.float64) / 255 * 2 - 1
+    # Averaging normals with opaque neighbours turns ragged band edges into clean curves that
+    # don't flicker as the surface moves.
+    opaque = (normal[..., 3] > 0).astype(np.float64)[..., None]
+    for _ in range(normal_blur):
+        padded, weight = np.pad(n * opaque, ((1, 1), (1, 1), (0, 0))), np.pad(opaque, ((1, 1), (1, 1), (0, 0)))
+        height, width = n.shape[:2]
+        shifts = [(dy, dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1)]
+        total = sum(padded[1 + dy:1 + dy + height, 1 + dx:1 + dx + width] for dy, dx in shifts)
+        count = sum(weight[1 + dy:1 + dy + height, 1 + dx:1 + dx + width] for dy, dx in shifts)
+        n = np.where(opaque > 0, total / np.maximum(count, 1), n)
     n /= np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-6)
     lambert = n @ (np.asarray(light, dtype=np.float64) / np.linalg.norm(light))
 

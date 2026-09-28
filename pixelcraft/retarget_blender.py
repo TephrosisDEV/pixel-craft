@@ -46,6 +46,7 @@ LIMB_CHILDREN = {
 }
 LEAF_PARENT = {"head": "neck"}
 POSTURE = {"hips", "spine", "spine1", "spine2", "neck", "head"}
+ARMS = {f"{side}{part}" for side in ("left", "right") for part in ("shoulder", "arm", "forearm", "hand")}
 for side in ("left", "right"):
     LIMB_CHILDREN.update({
         f"{side}shoulder": [f"{side}arm"], f"{side}arm": [f"{side}forearm"], f"{side}forearm": [f"{side}hand"],
@@ -79,11 +80,12 @@ def facing(armature) -> Vector:
     return forward.normalized()
 
 
-def retarget(source, action, target, name, keep_posture=False):
+def retarget(source, action, target, name, keep_posture=False, arm_motion=1.0):
     """Bake `action` (played on armature `source`) onto `target` as a new action called `name`.
 
     With `keep_posture`, the target's torso and head keep their own rest pose (a hunch, a lean)
-    instead of being straightened onto the source's; limbs are still aligned.
+    instead of being straightened onto the source's; limbs are still aligned. `arm_motion` scales
+    how far the arms move away from their rest pose (below 1 for creatures with very long arms).
     """
     source_roles, target_roles = roles(source), roles(target)
     shared = [role for role in ROLES if role in source_roles and role in target_roles]
@@ -136,6 +138,8 @@ def retarget(source, action, target, name, keep_posture=False):
                 src_matrix = source.matrix_world @ source.pose.bones[source_roles[role]].matrix
                 # The source bone's change from its rest pose, applied in the target's frame.
                 change = _rotation(src_matrix) @ src_rest[role][1].inverted()
+                if role in ARMS:
+                    change = Quaternion().slerp(change, arm_motion)
                 world_rotation = to_target @ change @ to_target.inverted() @ corrections[role] @ tgt_rest[role][1]
                 head = chain.to_translation()
                 if role == "hips":

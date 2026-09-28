@@ -171,6 +171,25 @@ def animate(armature):
         (18, {"Spine": r(z=20), "RightArm": r(x=-40, z=30), "RightForeArm": r(x=-20), "LeftUpLeg": r(x=15)}),
         (27, {"RightArm": r(x=-10), "RightForeArm": r(x=-40)}),
     ])
+
+    # Side-view creature attack: wind up, lunge, claw swipe, follow through, recover. Every
+    # rotation is a pitch (x), so it reads cleanly in profile.
+    rest = {"RightArm": r(x=-10), "RightForeArm": r(x=-20), "LeftArm": r(x=-10), "LeftForeArm": r(x=-20)}
+    key("lunge", [
+        (1, rest),
+        (8, {"Hips": r(x=-8), "Spine": r(x=-15), "Head": r(x=10),
+             "RightArm": r(x=-165), "RightForeArm": r(x=-45), "LeftArm": r(x=15), "LeftForeArm": r(x=-30),
+             "LeftUpLeg": r(x=-20), "LeftLeg": r(x=20), "RightUpLeg": r(x=10)}),
+        (12, {"Hips": r(x=10), "Spine": r(x=30), "Head": r(x=-15),
+              "RightArm": r(x=-70), "RightForeArm": r(x=-5), "LeftArm": r(x=-35), "LeftForeArm": r(x=-20),
+              "LeftUpLeg": r(x=-40), "LeftLeg": r(x=35), "RightUpLeg": r(x=25), "RightLeg": r(x=10)}),
+        (16, {"Hips": r(x=12), "Spine": r(x=35), "Head": r(x=-10),
+              "RightArm": r(x=15), "RightForeArm": r(x=-25), "LeftArm": r(x=-45), "LeftForeArm": r(x=-20),
+              "LeftUpLeg": r(x=-40), "LeftLeg": r(x=35), "RightUpLeg": r(x=25), "RightLeg": r(x=10)}),
+        (22, {"Hips": r(x=5), "Spine": r(x=15), "RightArm": r(x=0), "RightForeArm": r(x=-30), "LeftArm": r(x=-20),
+              "LeftUpLeg": r(x=-15), "LeftLeg": r(x=15), "RightUpLeg": r(x=10)}),
+        (29, rest),
+    ])
     data.action = None
 
 

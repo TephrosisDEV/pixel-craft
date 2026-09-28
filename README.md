@@ -44,6 +44,7 @@ Paths are relative to the config file. Everything except `model` and `output` is
 
 ```jsonc
 {
+  "preset": "trellis",                  // optional: every fix for raw TRELLIS.2 models (see pixelcraft/presets.py)
   "model": "hero.fbx",                  // .blend, .fbx, .glb/.gltf or .obj
   "animations": {                       // optional: name -> animation file, or file#ActionName to pick one
     "idle": "anims/idle.fbx",           // action from a multi-animation file (glb/fbx/blend). Humanoid
@@ -64,9 +65,14 @@ Paths are relative to the config file. Everything except `model` and `output` is
     "texture_colors": "srgb", // "linear" for exports whose textures come out far too dark (TRELLIS.2)
     "keep_posture": false, // keep the model's own hunch/lean when retargeting upright animations
     "texture_bleed": true, // fill texture-atlas gaps so edge pixels don't pick up the white filler
-    "texture_despeckle": false // also refill small bright spots baked into generated textures (TRELLIS.2)
+    "texture_despeckle": false, // also refill small bright spots baked into generated textures (TRELLIS.2)
+    "texture_size": null,  // downscale textures to this many px ("auto" = 2x height)
+    "remesh": null,        // voxel size as a fraction of height (0.005): fuses fragmented generated meshes
+    "colour_smoothing": 4, // vertex colour smoothing passes after remesh
+    "arm_motion": 1.0      // scale arm movement of retargeted clips, or per clip: {"walk": 0.5}
   },
   "shade": {
+    "normal_blur": 0,                   // smooth normals per frame so light bands don't flicker
     "light": [-0.5, 0.55, 0.65],        // towards the light, in screen space: x right, y up, z to viewer
     "bands": [                          // hard light bands; first one whose threshold is reached wins
       {"above": 0.35, "multiply": "#ffffff"},
@@ -144,7 +150,8 @@ synthetically from 3D models through a pixel-art shader. See
 9. [Blender pipeline, the Dead Cells route](docs/09-blender-pipeline.md)
 10. [Automating image → rigged, animated 3D](docs/10-image-to-3d-automation.md)
 11. [Windows setup for local image → 3D](docs/11-windows-setup.md)
-12. [Sources](docs/sources.md)
+12. [Recipe: a new enemy](docs/12-enemy-recipe.md)
+13. [Sources](docs/sources.md)
 
 ## Research notes
 

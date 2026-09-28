@@ -1,0 +1,22 @@
+{
+ "preset": "trellis",
+ "model": "beast_rigged.blend",
+ "animations": {
+  "walk": "../../animations/Soldier.glb#Walk",
+  "attack": "../../../examples/knight.blend#lunge"
+ },
+ "output": "../../../out/beast",
+ "render": {
+  "height": 140,
+  "directions": 1,
+  "start_angle": 90,
+  "pitch": 0,
+  "frame_step": 1,
+  "arm_motion": {
+   "walk": 0.5
+  }
+ },
+ "preview": {
+  "scale": 3
+ }
+}

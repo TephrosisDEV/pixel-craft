@@ -95,3 +95,14 @@ def test_dim_highlights_removes_small_light_spots_but_keeps_light_areas():
     cleaned = dim_highlights(image)
     assert cleaned[5, 5].tolist() == [40, 30, 30, 255]
     assert cleaned[6, 20].tolist() == [230, 230, 230, 255]
+
+
+def test_presets_fill_in_under_the_configs_own_values():
+    from pixelcraft.presets import apply
+
+    config = apply({"preset": "trellis", "render": {"height": 140, "remesh": None}})
+    assert config["render"]["height"] == 140
+    assert config["render"]["remesh"] is None
+    assert config["render"]["strip_ground"] is True
+    assert config["cleanup"]["highlights"] is True
+    assert apply({"render": {"height": 64}}) == {"render": {"height": 64}}

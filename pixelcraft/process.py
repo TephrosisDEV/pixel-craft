@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 
 from . import palette as palettes
+from .presets import apply as apply_preset
 from .color import hex_to_rgb, to_uint8
 from .shade import despeckle, dim_highlights, outline, toon
 from .sheet import aseprite_json, pack, preview_frames, write_gif, write_mp4
@@ -19,6 +20,7 @@ DEFAULTS = {
             {"above": -0.2, "multiply": "#b8b0d0"},
             {"above": -1.0, "multiply": "#6f6a9a"},
         ],
+        "normal_blur": 0,
     },
     "palette": {"max_colors": 24, "min_share": 0.002, "file": None},
     "cleanup": {"despeckle": False, "highlights": False},
@@ -28,7 +30,7 @@ DEFAULTS = {
 
 
 def process(config_path: Path) -> str:
-    config = json.loads(config_path.read_text())
+    config = apply_preset(json.loads(config_path.read_text()))
     base = config_path.parent
     opts = {section: {**values, **config.get(section, {})} for section, values in DEFAULTS.items()}
     out_dir = (base / config["output"]).resolve()
@@ -45,7 +47,7 @@ def process(config_path: Path) -> str:
         for direction in manifest["directions"]
     }
     shaded = {
-        name: [toon(albedo, normal, opts["shade"]["light"], opts["shade"]["bands"]) for albedo, normal in frames]
+        name: [toon(albedo, normal, opts["shade"]["light"], opts["shade"]["bands"], opts["shade"]["normal_blur"]) for albedo, normal in frames]
         for name, frames in passes.items()
     }
 

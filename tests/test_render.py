@@ -24,7 +24,7 @@ def test_render_gives_flat_hard_edged_frames_for_each_direction(tmp_path):
     render = tmp_path / "out" / "render"
     manifest = json.loads((render / "manifest.json").read_text())
     assert [d["name"] for d in manifest["directions"]] == ["s", "se", "e", "ne", "n", "nw", "w", "sw"]
-    assert {a["name"] for a in manifest["actions"]} == {"idle", "walk", "attack"}
+    assert {a["name"] for a in manifest["actions"]} == {"idle", "walk", "attack", "lunge"}
 
     for path in render.glob("*/*/*_albedo.png"):
         frame = np.array(Image.open(path))

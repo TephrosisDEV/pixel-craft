@@ -25,6 +25,8 @@ import bmesh  # noqa: I001  (only importable once bpy is loaded)
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from presets import apply as apply_preset  # noqa: E402
+from remesh_blender import remesh  # noqa: E402
 from retarget_blender import facing, is_humanoid, retarget  # noqa: E402
 
 # Facing angle measured in screen terms: 0 = towards the viewer, 90 = screen right.
@@ -46,18 +48,22 @@ DEFAULTS = {
     "strip_ground": True,
     "texture_bleed": True,
     "texture_despeckle": False,
+    "texture_size": None,
+    "remesh": None,
+    "colour_smoothing": 4,
+    "arm_motion": 1.0,
 }
 
 
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     config_path = Path(argv[0]).resolve()
-    config = json.loads(config_path.read_text())
+    config = apply_preset(json.loads(config_path.read_text()))
     base = config_path.parent
     opts = {**DEFAULTS, **config.get("render", {})}
     out_dir = (base / config["output"] / "render").resolve()
 
-    load_scene(base / config["model"], opts["keep_posture"], {
+    load_scene(base / config["model"], opts["keep_posture"], opts["arm_motion"], {
         name: (base / path.split("#")[0], path.split("#")[1] if "#" in path else None)
         for name, path in config.get("animations", {}).items()
     })
@@ -79,6 +85,14 @@ def main():
     # After albedo_materials: changing an image's colour space reloads it and would drop the edits.
     if opts["texture_bleed"] or opts["texture_despeckle"]:
         bleed_textures(meshes, opts["texture_despeckle"])
+    if opts["texture_size"]:
+        shrink_textures(meshes, opts["texture_size"] if opts["texture_size"] != "auto" else 2 * opts["height"])
+    if opts["remesh"]:
+        zs = [(o.matrix_world @ v.co).z for o in meshes for v in o.data.vertices]
+        for obj in meshes:
+            voxel = (max(zs) - min(zs)) * opts["remesh"] / max(obj.matrix_world.to_scale())
+            count = remesh(obj, voxel, opts["colour_smoothing"], opts["texture_colors"] == "linear")
+            print(f"render: remeshed {obj.name} to {count} vertices")
     normal_material = make_normal_material()
 
     unit = world_height(scene, armature, meshes, actions) / opts["height"]
@@ -119,7 +133,7 @@ def main():
     print(f"render: {len(actions)} actions x {len(directions)} directions, canvas {width}x{height} -> {out_dir}")
 
 
-def load_scene(model_path, keep_posture, animations):
+def load_scene(model_path, keep_posture, arm_motion, animations):
     """Open or import the model, then bring in each animation as an action named after its key.
 
     `animations` maps name -> (file, action name or None for the file's first action). Humanoid
@@ -144,7 +158,8 @@ def load_scene(model_path, keep_posture, animations):
             sys.exit(f"render: no animation {wanted or ''} in {path}".replace("  ", " "))
         source = next((o for o in set(bpy.data.objects) - before_objects if o.type == "ARMATURE"), None)
         if target is not None and source is not None and is_humanoid(source) and is_humanoid(target):
-            kept = retarget(source, action, target, name, keep_posture)
+            scale = arm_motion.get(name, 1.0) if isinstance(arm_motion, dict) else arm_motion
+            kept = retarget(source, action, target, name, keep_posture, scale)
         else:
             kept = action
             kept.use_fake_user = True
@@ -356,9 +371,7 @@ def bleed_textures(meshes, despeckle=False):
     small spots much brighter than their surroundings (baked-in highlights, generation noise)
     are refilled the same way.
     """
-    images = {node.image for obj in meshes for slot in obj.material_slots if slot.material and slot.material.use_nodes
-              for node in slot.material.node_tree.nodes if node.type == "TEX_IMAGE" and node.image is not None}
-    for image in images:
+    for image in _colour_images(meshes):
         width, height = image.size
         pixels = np.array(image.pixels[:], dtype=np.float32).reshape(height, width, 4)
         filled = pixels[..., 3] > 0.5
@@ -384,6 +397,22 @@ def bleed_textures(meshes, despeckle=False):
             filled |= grow
         pixels[..., :3] = colour
         image.pixels[:] = pixels.ravel()
+
+
+def shrink_textures(meshes, size):
+    """Downscale colour textures to about `size` px (box filter), so each sprite pixel samples a
+    stable averaged patch instead of whichever fine texel it hits this frame: fine texture detail
+    otherwise makes pixels shimmer as the model moves."""
+    for image in _colour_images(meshes):
+        width, height = image.size
+        scale = size / max(width, height)
+        if scale < 1:
+            image.scale(max(1, round(width * scale)), max(1, round(height * scale)))
+
+
+def _colour_images(meshes):
+    return {node.image for obj in meshes for slot in obj.material_slots if slot.material and slot.material.use_nodes
+            for node in slot.material.node_tree.nodes if node.type == "TEX_IMAGE" and node.image is not None}
 
 
 def albedo_materials(meshes, linear_textures=False):
