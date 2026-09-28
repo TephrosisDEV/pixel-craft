@@ -62,7 +62,9 @@ Paths are relative to the config file. Everything except `model` and `output` is
     "padding": 2,          // empty pixels around the sprite
     "strip_ground": true,  // remove mesh pieces lying flat at the feet (image-to-3D ground shadows)
     "texture_colors": "srgb", // "linear" for exports whose textures come out far too dark (TRELLIS.2)
-    "keep_posture": false  // keep the model's own hunch/lean when retargeting upright animations
+    "keep_posture": false, // keep the model's own hunch/lean when retargeting upright animations
+    "texture_bleed": true, // fill texture-atlas gaps so edge pixels don't pick up the white filler
+    "texture_despeckle": false // also refill small bright spots baked into generated textures (TRELLIS.2)
   },
   "shade": {
     "light": [-0.5, 0.55, 0.65],        // towards the light, in screen space: x right, y up, z to viewer

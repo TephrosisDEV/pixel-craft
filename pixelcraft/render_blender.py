@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 import bpy
+import numpy as np
 import bmesh  # noqa: I001  (only importable once bpy is loaded)
 from mathutils import Matrix, Vector
 
@@ -43,6 +44,8 @@ DEFAULTS = {
     "texture_colors": "srgb",
     "keep_posture": False,
     "strip_ground": True,
+    "texture_bleed": True,
+    "texture_despeckle": False,
 }
 
 
@@ -73,6 +76,9 @@ def main():
     camera = setup_camera(scene)
     setup_render(scene)
     albedo_materials(meshes, opts["texture_colors"] == "linear")
+    # After albedo_materials: changing an image's colour space reloads it and would drop the edits.
+    if opts["texture_bleed"] or opts["texture_despeckle"]:
+        bleed_textures(meshes, opts["texture_despeckle"])
     normal_material = make_normal_material()
 
     unit = world_height(scene, armature, meshes, actions) / opts["height"]
@@ -340,6 +346,44 @@ def setup_render(scene):
 def render_to(scene, path):
     scene.render.filepath = path
     bpy.ops.render.render(write_still=True)
+
+
+def bleed_textures(meshes, despeckle=False):
+    """Fill the transparent gaps between UV islands with the nearest island colour.
+
+    Generated texture atlases fill those gaps with white; sampling one pixel per sprite pixel
+    near an island edge then lands on the filler and shows up as white specks. With `despeckle`,
+    small spots much brighter than their surroundings (baked-in highlights, generation noise)
+    are refilled the same way.
+    """
+    images = {node.image for obj in meshes for slot in obj.material_slots if slot.material and slot.material.use_nodes
+              for node in slot.material.node_tree.nodes if node.type == "TEX_IMAGE" and node.image is not None}
+    for image in images:
+        width, height = image.size
+        pixels = np.array(image.pixels[:], dtype=np.float32).reshape(height, width, 4)
+        filled = pixels[..., 3] > 0.5
+        if despeckle:
+            lightness = pixels[..., :3].mean(-1)
+            background = lightness
+            for _ in range(3):
+                background = np.median(np.stack([np.roll(background, (dy, dx), (0, 1))
+                                                 for dy in (-1, 0, 1) for dx in (-1, 0, 1)]), axis=0)
+            filled &= lightness < background + 0.12
+        if filled.all() or not filled.any():
+            continue
+        colour = np.where(filled[..., None], pixels[..., :3], 0)
+        for _ in range(64):
+            if filled.all():
+                break
+            total, count = np.zeros_like(colour), np.zeros(filled.shape, dtype=np.float32)
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                total += np.roll(colour * filled[..., None], (dy, dx), (0, 1))
+                count += np.roll(filled, (dy, dx), (0, 1))
+            grow = ~filled & (count > 0)
+            colour[grow] = total[grow] / count[grow, None]
+            filled |= grow
+        pixels[..., :3] = colour
+        image.pixels[:] = pixels.ravel()
 
 
 def albedo_materials(meshes, linear_textures=False):
