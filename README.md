@@ -129,7 +129,8 @@ synthetically from 3D models through a pixel-art shader. See
 7. [Roadmap and costs](docs/07-roadmap.md)
 8. [Existing open-source projects](docs/08-existing-projects.md)
 9. [Blender pipeline, the Dead Cells route](docs/09-blender-pipeline.md)
-10. [Sources](docs/sources.md)
+10. [Automating image → rigged, animated 3D](docs/10-image-to-3d-automation.md)
+11. [Sources](docs/sources.md)
 
 ## Research notes
 
