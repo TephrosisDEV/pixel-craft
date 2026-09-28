@@ -1,7 +1,7 @@
 import numpy as np
 
 from pixelcraft import palette
-from pixelcraft.shade import despeckle, outline, toon
+from pixelcraft.shade import despeckle, dim_highlights, outline, toon
 from pixelcraft.sheet import aseprite_json
 
 BANDS = [
@@ -78,3 +78,20 @@ def test_despeckle_recolours_isolated_pixels_only():
     assert cleaned[1, 1].tolist() == [10, 10, 10, 255]
     assert cleaned[1, 3].tolist() == [0, 200, 0, 255]
     assert cleaned[2, 3].tolist() == [0, 200, 0, 255]
+
+
+def test_palette_build_drops_colours_only_a_few_pixels_use():
+    pixels = np.array([[40, 30, 30]] * 996 + [[250, 250, 250]] * 4, dtype=np.uint8)
+    assert palette.build(pixels, 8, min_share=0.01).tolist() == [[40, 30, 30]]
+    assert len(palette.build(pixels, 8)) == 2
+
+
+def test_dim_highlights_removes_small_light_spots_but_keeps_light_areas():
+    image = np.zeros((12, 24, 4), dtype=np.uint8)
+    image[...] = [40, 30, 30, 255]
+    image[5:7, 5:7] = [220, 220, 220, 255]
+    image[:, 16:] = [230, 230, 230, 255]
+    image[:, :2] = 0
+    cleaned = dim_highlights(image)
+    assert cleaned[5, 5].tolist() == [40, 30, 30, 255]
+    assert cleaned[6, 20].tolist() == [230, 230, 230, 255]

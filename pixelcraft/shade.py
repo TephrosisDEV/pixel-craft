@@ -1,8 +1,10 @@
 """Toon shading from the albedo and normal passes, and pixel outlines."""
 
+import warnings
+
 import numpy as np
 
-from .color import hex_to_rgb, linear_to_srgb, srgb_to_linear, to_uint8
+from .color import hex_to_rgb, linear_to_srgb, srgb_to_linear, srgb_to_oklab, to_uint8
 
 
 def toon(albedo: np.ndarray, normal: np.ndarray, light: list[float], bands: list[dict]) -> np.ndarray:
@@ -65,4 +67,30 @@ def despeckle(image: np.ndarray) -> np.ndarray:
     speckle = (ids >= 0) & ((neighbours == ids).sum(0) == 0) & (majority >= 0)
     result = image.copy()
     result[speckle, 0], result[speckle, 1], result[speckle, 2] = majority[speckle] >> 16, majority[speckle] >> 8 & 255, majority[speckle] & 255
+    return result
+
+
+def dim_highlights(image: np.ndarray, margin: float = 0.15, radius: int = 3) -> np.ndarray:
+    """Recolour small spots much lighter than their surroundings with a typical nearby colour.
+
+    Compares each opaque pixel's OKLab lightness with the median of the opaque pixels in a
+    (2 * radius + 1)² window. Light areas bigger than about half the window are their own
+    surroundings and stay as they are.
+    """
+    opaque = image[..., 3] > 0
+    lightness = np.where(opaque, srgb_to_oklab(image[..., :3] / 255)[..., 0], np.nan)
+    offsets = [(dy, dx) for dy in range(-radius, radius + 1) for dx in range(-radius, radius + 1)]
+    padded = np.pad(lightness, radius, constant_values=np.nan)
+    colours = np.pad(image[..., :3], ((radius, radius), (radius, radius), (0, 0)))
+    height, width = lightness.shape
+    window = np.stack([padded[radius + dy:radius + dy + height, radius + dx:radius + dx + width] for dy, dx in offsets])
+    with np.errstate(invalid="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        median = np.nanmedian(window, axis=0)
+        bright = opaque & (lightness > median + margin)
+    result = image.copy()
+    for y, x in zip(*np.nonzero(bright)):
+        distance = np.abs(window[:, y, x] - median[y, x])
+        dy, dx = offsets[int(np.nanargmin(distance))]
+        result[y, x, :3] = colours[y + radius + dy, x + radius + dx]
     return result

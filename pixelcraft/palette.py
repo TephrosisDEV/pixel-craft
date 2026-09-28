@@ -19,24 +19,31 @@ def load(path: Path) -> np.ndarray:
     return np.unique(pixels[pixels[:, 3] > 0][:, :3], axis=0)
 
 
-def build(pixels: np.ndarray, max_colors: int, seed: int = 0) -> np.ndarray:
-    """Up to `max_colors` uint8 RGB colours representing `pixels` (N x 3 uint8), by weighted k-means in OKLab."""
+def build(pixels: np.ndarray, max_colors: int, min_share: float = 0.0, seed: int = 0) -> np.ndarray:
+    """Up to `max_colors` uint8 RGB colours representing `pixels` (N x 3 uint8), by weighted k-means in OKLab.
+
+    Colours that would cover less than `min_share` of the pixels are dropped, so a few stray
+    texels (baked highlights, noise) can't claim a palette slot and show up as specks.
+    """
     colours, counts = np.unique(pixels, axis=0, return_counts=True)
-    if len(colours) <= max_colors:
-        return colours
     lab = srgb_to_oklab(colours / 255)
     weights = counts.astype(np.float64)
-    centres = _plus_plus_init(lab, weights, max_colors, np.random.default_rng(seed))
-    for _ in range(50):
-        labels = _nearest(lab, centres)
-        updated = np.array([
-            np.average(lab[labels == k], axis=0, weights=weights[labels == k]) if np.any(labels == k) else centres[k]
-            for k in range(max_colors)
-        ])
-        if np.allclose(updated, centres, atol=1e-6):
-            break
-        centres = updated
-    return np.unique(to_uint8(oklab_to_srgb(centres)), axis=0)
+    if len(colours) <= max_colors:
+        centres = lab
+    else:
+        centres = _plus_plus_init(lab, weights, max_colors, np.random.default_rng(seed))
+        for _ in range(50):
+            labels = _nearest(lab, centres)
+            updated = np.array([
+                np.average(lab[labels == k], axis=0, weights=weights[labels == k]) if np.any(labels == k) else centres[k]
+                for k in range(max_colors)
+            ])
+            if np.allclose(updated, centres, atol=1e-6):
+                break
+            centres = updated
+    share = np.bincount(_nearest(lab, centres), weights=weights, minlength=len(centres)) / weights.sum()
+    kept = centres[share >= min_share] if np.any(share >= min_share) else centres[[np.argmax(share)]]
+    return np.unique(to_uint8(oklab_to_srgb(kept)), axis=0)
 
 
 def apply(image: np.ndarray, palette: np.ndarray) -> np.ndarray:

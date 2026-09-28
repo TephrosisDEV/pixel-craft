@@ -49,15 +49,38 @@ def aseprite_json(strips: dict[str, int], canvas: tuple[int, int], fps: float, i
     }
 
 
-def preview_gif(rows: list[list[np.ndarray]], fps: float, scale: int, background: str, path) -> None:
-    """Animated GIF with one cell per row entry (e.g. every direction of one action), scaled up with nearest neighbour."""
+def preview_frames(rows: list[list[np.ndarray]], scale: int, background: str) -> list[Image.Image]:
+    """One RGB image per animation frame, with one cell per row entry (e.g. every direction of one action)."""
     height, width = rows[0][0].shape[:2]
     backdrop = np.array([*to_uint8(hex_to_rgb(background)), 255], dtype=np.uint8)
-    length = max(len(frames) for frames in rows)
     images = []
-    for index in range(length):
+    for index in range(max(len(frames) for frames in rows)):
         canvas = Image.fromarray(np.broadcast_to(backdrop, (height, width * len(rows), 4)).copy())
         for column, frames in enumerate(rows):
             canvas.alpha_composite(Image.fromarray(frames[index % len(frames)]), (column * width, 0))
         images.append(canvas.convert("RGB").resize((canvas.width * scale, canvas.height * scale), Image.NEAREST))
+    return images
+
+
+def write_gif(images: list[Image.Image], fps: float, path) -> None:
     images[0].save(path, save_all=True, append_images=images[1:], duration=round(1000 / fps), loop=0)
+
+
+def write_mp4(images: list[Image.Image], fps: float, path, loops: int = 4) -> bool:
+    """H.264 video (plays on phones that show GIFs as stills). Needs the optional imageio-ffmpeg package."""
+    try:
+        import imageio_ffmpeg
+    except ImportError:
+        return False
+    width, height = images[0].size
+    even = (width + width % 2, height + height % 2)
+    writer = imageio_ffmpeg.write_frames(str(path), even, fps=fps, codec="libx264", pix_fmt_out="yuv420p",
+                                         output_params=["-crf", "12"], macro_block_size=1)
+    writer.send(None)
+    for _ in range(loops):
+        for image in images:
+            frame = Image.new("RGB", even, image.getpixel((0, 0)))
+            frame.paste(image)
+            writer.send(frame.tobytes())
+    writer.close()
+    return True

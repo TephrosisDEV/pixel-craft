@@ -365,10 +365,10 @@ def bleed_textures(meshes, despeckle=False):
         if despeckle:
             lightness = pixels[..., :3].mean(-1)
             background = lightness
-            for _ in range(3):
+            for _ in range(6):
                 background = np.median(np.stack([np.roll(background, (dy, dx), (0, 1))
                                                  for dy in (-1, 0, 1) for dx in (-1, 0, 1)]), axis=0)
-            filled &= lightness < background + 0.12
+            filled &= lightness < background * 1.8 + 0.04
         if filled.all() or not filled.any():
             continue
         colour = np.where(filled[..., None], pixels[..., :3], 0)

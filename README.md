@@ -36,7 +36,7 @@ Output in `out/<name>/`:
 | `sheet.png`, `sheet.json` | Final sprites: one row per animation × direction, Aseprite "array" JSON with a frame tag per row and the pivot |
 | `albedo.png`, `normal.png` | Same layout, unshaded colour and camera-space normals, for toon lighting in the engine (Dead Cells style) |
 | `palette.hex` | The shared palette |
-| `previews/<action>.gif` | Every direction of an animation side by side, scaled up |
+| `previews/<action>.gif`, `.mp4` | Every direction of an animation side by side, scaled up. The MP4 (for phones that show GIFs as stills) needs `pip install -e ".[video]"` |
 
 ### Config
 
@@ -74,8 +74,9 @@ Paths are relative to the config file. Everything except `model` and `output` is
       {"above": -1.0, "multiply": "#6f6a9a"}
     ]
   },
-  "palette": {"max_colors": 24, "file": null},   // or a .hex, .gpl or image palette to force
-  "cleanup": {"despeckle": false},              // recolour isolated pixels: helps detailed textures, eats 1px eyes
+  "palette": {"max_colors": 24, "min_share": 0.002, "file": null}, // drop colours under 0.2% of pixels; file forces a .hex/.gpl/image palette
+  "cleanup": {"despeckle": false,               // recolour isolated pixels: helps detailed textures, eats 1px eyes
+              "highlights": false},             // recolour small spots much lighter than their surroundings
   "outline": {"mode": "outer", "color": "auto"}, // outer | inner | none; auto = darkest palette colour
   "preview": {"scale": 4, "background": "#22222a"}
 }

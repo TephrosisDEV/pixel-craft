@@ -7,6 +7,7 @@ dependencies = ["numpy>=1.24", "pillow>=10"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+video = ["imageio-ffmpeg>=0.5"]
 
 [project.scripts]
 pixelcraft = "pixelcraft.__main__:main"

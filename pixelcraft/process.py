@@ -8,8 +8,8 @@ from PIL import Image
 
 from . import palette as palettes
 from .color import hex_to_rgb, to_uint8
-from .shade import despeckle, outline, toon
-from .sheet import aseprite_json, pack, preview_gif
+from .shade import despeckle, dim_highlights, outline, toon
+from .sheet import aseprite_json, pack, preview_frames, write_gif, write_mp4
 
 DEFAULTS = {
     "shade": {
@@ -20,8 +20,8 @@ DEFAULTS = {
             {"above": -1.0, "multiply": "#6f6a9a"},
         ],
     },
-    "palette": {"max_colors": 24, "file": None},
-    "cleanup": {"despeckle": False},
+    "palette": {"max_colors": 24, "min_share": 0.002, "file": None},
+    "cleanup": {"despeckle": False, "highlights": False},
     "outline": {"mode": "outer", "color": "auto"},
     "preview": {"scale": 4, "background": "#22222a"},
 }
@@ -53,9 +53,13 @@ def process(config_path: Path) -> str:
     colours = (
         palettes.load(base / opts["palette"]["file"]) if opts["palette"]["file"]
         else palettes.build(np.concatenate([f[f[..., 3] > 0][:, :3] for frames in shaded.values() for f in frames]),
-                            opts["palette"]["max_colors"])
+                            opts["palette"]["max_colors"], opts["palette"]["min_share"])
     )
-    clean = despeckle if opts["cleanup"]["despeckle"] else (lambda frame: frame)
+    def clean(frame):
+        if opts["cleanup"]["highlights"]:
+            frame = dim_highlights(frame)
+        return despeckle(frame) if opts["cleanup"]["despeckle"] else frame
+
     line_colour = palettes.darkest(colours) if opts["outline"]["color"] == "auto" else to_uint8(hex_to_rgb(opts["outline"]["color"]))
     final = {
         name: [outline(clean(palettes.apply(frame, colours)), opts["outline"]["mode"], line_colour) for frame in frames]
@@ -73,7 +77,8 @@ def process(config_path: Path) -> str:
     (out_dir / "previews").mkdir(exist_ok=True)
     for action in manifest["actions"]:
         rows = [final[f"{action['name']}_{d['name']}"] for d in manifest["directions"]]
-        preview_gif(rows, fps, opts["preview"]["scale"], opts["preview"]["background"],
-                    out_dir / "previews" / f"{action['name']}.gif")
+        images = preview_frames(rows, opts["preview"]["scale"], opts["preview"]["background"])
+        write_gif(images, fps, out_dir / "previews" / f"{action['name']}.gif")
+        write_mp4(images, fps, out_dir / "previews" / f"{action['name']}.mp4")
 
     return f"process: {len(final)} strips, {len(colours)} colours, canvas {canvas[0]}x{canvas[1]} -> {out_dir}"
