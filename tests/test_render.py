@@ -31,3 +31,26 @@ def test_render_gives_flat_hard_edged_frames_for_each_direction(tmp_path):
         assert list(frame.shape[1::-1]) == manifest["canvas"]
         assert set(np.unique(frame[..., 3])) <= {0, 255}
         assert {tuple(int(v) for v in c) for c in frame[frame[..., 3] > 0][:, :3]} <= KNIGHT_COLOURS
+
+
+def test_retargeting_an_animation_onto_its_own_rig_reproduces_it(tmp_path):
+    for name in ("knight.blend", "source.blend"):
+        subprocess.run([sys.executable, str(ROOT / "examples" / "make_test_knight.py"), str(tmp_path / name)], check=True)
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({
+        "model": "knight.blend",
+        "animations": {"walk_retargeted": "source.blend#walk"},
+        "actions": ["walk", "walk_retargeted"],
+        "output": "out",
+        "render": {"height": 48, "directions": 4, "frame_step": 2},
+    }))
+    subprocess.run([sys.executable, str(ROOT / "pixelcraft" / "render_blender.py"), str(config)], check=True)
+
+    render = tmp_path / "out" / "render"
+    overlaps = []
+    for original in render.glob("walk/*/*_albedo.png"):
+        a = np.array(Image.open(original))[..., 3] > 0
+        b = np.array(Image.open(render / "walk_retargeted" / original.parent.name / original.name))[..., 3] > 0
+        overlaps.append((a & b).sum() / (a | b).sum())
+    assert len(overlaps) == 4 * 16
+    assert min(overlaps) > 0.97

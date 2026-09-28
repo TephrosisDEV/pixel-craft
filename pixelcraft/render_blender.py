@@ -15,11 +15,15 @@ the same split Dead Cells used.
 
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
 import bpy
 from mathutils import Matrix, Vector
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from retarget_blender import facing, is_humanoid, retarget  # noqa: E402
 
 # Facing angle measured in screen terms: 0 = towards the viewer, 90 = screen right.
 FACING_NAMES = {round(i * 22.5, 1): name for i, name in enumerate(
@@ -32,7 +36,7 @@ DEFAULTS = {
     "directions": 8,
     "start_angle": None,
     "pitch": 30.0,
-    "front_axis": "-Y",
+    "front_axis": "auto",
     "frame_step": 2,
     "padding": 2,
 }
@@ -46,7 +50,10 @@ def main():
     opts = {**DEFAULTS, **config.get("render", {})}
     out_dir = (base / config["output"] / "render").resolve()
 
-    load_scene(base / config["model"], {name: base / path for name, path in config.get("animations", {}).items()})
+    load_scene(base / config["model"], {
+        name: (base / path.split("#")[0], path.split("#")[1] if "#" in path else None)
+        for name, path in config.get("animations", {}).items()
+    })
     scene = bpy.context.scene
     armature = next((o for o in scene.objects if o.type == "ARMATURE"), None)
     meshes = [o for o in scene.objects if o.type == "MESH" and not o.hide_render]
@@ -63,7 +70,8 @@ def main():
     normal_material = make_normal_material()
 
     unit = world_height(scene, armature, meshes, actions) / opts["height"]
-    bases = {d["name"]: camera_basis(d["angle"], opts["front_axis"], pitch) for d in directions}
+    front = front_angle(armature, opts["front_axis"])
+    bases = {d["name"]: camera_basis(d["angle"], front, pitch) for d in directions}
     x0, x1, y0, y1 = canvas_bounds(scene, armature, meshes, actions, bases.values(), unit, opts["padding"])
     width, height = x1 - x0, y1 - y0
     scene.render.resolution_x, scene.render.resolution_y = width, height
@@ -99,25 +107,43 @@ def main():
     print(f"render: {len(actions)} actions x {len(directions)} directions, canvas {width}x{height} -> {out_dir}")
 
 
-def load_scene(model_path, animation_paths):
-    """Open or import the model, then pull each animation file's action onto it, named after its key."""
+def load_scene(model_path, animations):
+    """Open or import the model, then bring in each animation as an action named after its key.
+
+    `animations` maps name -> (file, action name or None for the file's first action). Humanoid
+    animations are retargeted onto the model's skeleton; anything else is assumed to already
+    use the model's own skeleton.
+    """
     if model_path.suffix == ".blend":
         bpy.ops.wm.open_mainfile(filepath=str(model_path))
     else:
         bpy.ops.wm.read_factory_settings(use_empty=True)
         import_file(model_path)
+    target = next((o for o in bpy.context.scene.objects if o.type == "ARMATURE"), None)
 
-    for name, path in animation_paths.items():
-        before_objects = set(bpy.data.objects)
-        before_actions = set(bpy.data.actions)
+    for name, (path, wanted) in animations.items():
+        before_objects, before_actions = set(bpy.data.objects), set(bpy.data.actions)
         import_file(path)
         new_actions = [a for a in bpy.data.actions if a not in before_actions]
-        if not new_actions:
-            sys.exit(f"render: no animation found in {path}")
-        new_actions[0].name = name
-        new_actions[0].use_fake_user = True
+        # Blender suffixes ".001" when the name is already taken, e.g. by the model's own copy.
+        action = (next((a for a in new_actions if re.sub(r"\.\d{3}$", "", a.name) == wanted), None) if wanted
+                  else next(iter(new_actions), None))
+        if action is None:
+            sys.exit(f"render: no animation {wanted or ''} in {path}".replace("  ", " "))
+        source = next((o for o in set(bpy.data.objects) - before_objects if o.type == "ARMATURE"), None)
+        if target is not None and source is not None and is_humanoid(source) and is_humanoid(target):
+            kept = retarget(source, action, target, name)
+        else:
+            kept = action
+            kept.use_fake_user = True
         for obj in set(bpy.data.objects) - before_objects:
             bpy.data.objects.remove(obj, do_unlink=True)
+        for leftover in new_actions:
+            if leftover is not kept:
+                bpy.data.actions.remove(leftover)
+        if name in bpy.data.actions and bpy.data.actions[name] is not kept:
+            bpy.data.actions[name].name = f"{name}.model"
+        kept.name = name
 
 
 def import_file(path):
@@ -128,6 +154,11 @@ def import_file(path):
         bpy.ops.import_scene.gltf(filepath=str(path))
     elif suffix == ".obj":
         bpy.ops.wm.obj_import(filepath=str(path))
+    elif suffix == ".blend":
+        with bpy.data.libraries.load(str(path)) as (source, loaded):
+            loaded.objects, loaded.actions = source.objects, source.actions
+        for obj in loaded.objects:
+            bpy.context.scene.collection.objects.link(obj)
     else:
         sys.exit(f"render: unsupported file type {path}")
 
@@ -169,9 +200,19 @@ def direction_list(count, start_angle):
     return directions
 
 
-def camera_basis(facing, front_axis, pitch):
-    """Right, up and forward vectors of a camera that sees the model facing `facing` degrees."""
-    azimuth = math.radians(FRONT_AXIS_ANGLE[front_axis] - facing)
+def front_angle(armature, front_axis):
+    """World angle (degrees from +X) the model faces: detected from a humanoid rig when "auto"."""
+    if front_axis != "auto":
+        return FRONT_AXIS_ANGLE[front_axis]
+    if armature is not None and is_humanoid(armature):
+        forward = facing(armature)
+        return math.degrees(math.atan2(forward.y, forward.x))
+    return FRONT_AXIS_ANGLE["-Y"]
+
+
+def camera_basis(facing_angle, front, pitch):
+    """Right, up and forward vectors of a camera that sees the model facing `facing_angle` degrees."""
+    azimuth = math.radians(front - facing_angle)
     elevation = math.radians(pitch)
     forward = -Vector((
         math.cos(elevation) * math.cos(azimuth),

@@ -45,17 +45,19 @@ Paths are relative to the config file. Everything except `model` and `output` is
 ```jsonc
 {
   "model": "hero.fbx",                  // .blend, .fbx, .glb/.gltf or .obj
-  "animations": {                       // optional: Mixamo "without skin" FBX per action;
-    "idle": "anims/idle.fbx",           // if left out, every action in the model is rendered
-    "walk": "anims/walk.fbx"
+  "animations": {                       // optional: name -> animation file, or file#ActionName to pick one
+    "idle": "anims/idle.fbx",           // action from a multi-animation file (glb/fbx/blend). Humanoid
+    "walk": "packs/UAL1.glb#Walk_Loop"  // animations are retargeted onto the model's own skeleton
   },
+  "actions": ["idle", "walk"],          // optional: which actions to render (default: the animations
+                                        // above, or every action in the model)
   "output": "out/hero",
   "render": {
     "height": 64,          // model height in pixels (seen from the side)
     "directions": 8,       // any count; 2 = side view (e, w), 4 = s/e/n/w, 8 adds diagonals
     "start_angle": null,   // first facing angle in degrees, 0 = towards the viewer
     "pitch": 30,           // camera elevation: 0 = side-on, 30-45 = top-down RPG
-    "front_axis": "-Y",    // which way the model faces (Mixamo: -Y)
+    "front_axis": "auto",  // which way the model faces: auto-detected on humanoid rigs, else -Y/+Y/+X/-X
     "frame_step": 2,       // render every Nth frame (30 fps source, 2 -> 15 fps)
     "padding": 2           // empty pixels around the sprite
   },
@@ -73,6 +75,11 @@ Paths are relative to the config file. Everything except `model` and `output` is
   "preview": {"scale": 4, "background": "#22222a"}
 }
 ```
+
+**Retargeting.** Humanoid skeletons are matched by bone role, with Mixamo names (`mixamorig:LeftArm`,
+`LeftArm`) and Unreal-style names (`upperarm_l`, `thigh_r`) both recognised. So Mixamo downloads and
+CC0 packs such as Quaternius' Universal Animation Library play on any humanoid model, whatever its
+rest pose (T or A), facing or proportions. Fingers aren't retargeted; they don't show at sprite size.
 
 Animations should be exported **in place** (Mixamo has a checkbox for it), otherwise the character
 walks out of the fixed canvas. Loops are expected to end on their first pose; the last frame of
@@ -130,7 +137,8 @@ synthetically from 3D models through a pixel-art shader. See
 8. [Existing open-source projects](docs/08-existing-projects.md)
 9. [Blender pipeline, the Dead Cells route](docs/09-blender-pipeline.md)
 10. [Automating image → rigged, animated 3D](docs/10-image-to-3d-automation.md)
-11. [Sources](docs/sources.md)
+11. [Windows setup for local image → 3D](docs/11-windows-setup.md)
+12. [Sources](docs/sources.md)
 
 ## Research notes
 

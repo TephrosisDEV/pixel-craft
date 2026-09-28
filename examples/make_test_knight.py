@@ -3,7 +3,7 @@
     python examples/make_test_knight.py examples/knight.blend      (bpy module)
     blender -b -P examples/make_test_knight.py -- examples/knight.blend
 
-Faces -Y like a Mixamo import. Every part is a box parented to a bone, coloured flat.
+Faces -Y like a Mixamo import. Every part is a box parented to a bone, coloured flat. Bones use Mixamo names.
 """
 
 import math
@@ -24,42 +24,42 @@ COLOURS = {
 
 # name: (head, tail, parent)
 BONES = {
-    "hips": ((0, 0, 0.95), (0, 0, 1.15), None),
-    "chest": ((0, 0, 1.15), (0, 0, 1.55), "hips"),
-    "head": ((0, 0, 1.55), (0, 0, 1.95), "chest"),
-    "arm.L": ((0.3, 0, 1.5), (0.3, 0, 1.2), "chest"),
-    "forearm.L": ((0.3, 0, 1.2), (0.3, 0, 0.95), "arm.L"),
-    "arm.R": ((-0.3, 0, 1.5), (-0.3, 0, 1.2), "chest"),
-    "forearm.R": ((-0.3, 0, 1.2), (-0.3, 0, 0.95), "arm.R"),
-    "thigh.L": ((0.12, 0, 0.95), (0.12, 0, 0.5), "hips"),
-    "shin.L": ((0.12, 0, 0.5), (0.12, 0, 0.05), "thigh.L"),
-    "thigh.R": ((-0.12, 0, 0.95), (-0.12, 0, 0.5), "hips"),
-    "shin.R": ((-0.12, 0, 0.5), (-0.12, 0, 0.05), "thigh.R"),
+    "Hips": ((0, 0, 0.95), (0, 0, 1.15), None),
+    "Spine": ((0, 0, 1.15), (0, 0, 1.55), "Hips"),
+    "Head": ((0, 0, 1.55), (0, 0, 1.95), "Spine"),
+    "LeftArm": ((0.3, 0, 1.5), (0.3, 0, 1.2), "Spine"),
+    "LeftForeArm": ((0.3, 0, 1.2), (0.3, 0, 0.95), "LeftArm"),
+    "RightArm": ((-0.3, 0, 1.5), (-0.3, 0, 1.2), "Spine"),
+    "RightForeArm": ((-0.3, 0, 1.2), (-0.3, 0, 0.95), "RightArm"),
+    "LeftUpLeg": ((0.12, 0, 0.95), (0.12, 0, 0.5), "Hips"),
+    "LeftLeg": ((0.12, 0, 0.5), (0.12, 0, 0.05), "LeftUpLeg"),
+    "RightUpLeg": ((-0.12, 0, 0.95), (-0.12, 0, 0.5), "Hips"),
+    "RightLeg": ((-0.12, 0, 0.5), (-0.12, 0, 0.05), "RightUpLeg"),
 }
 
 # bone: [(centre, size, colour), ...] in world space at rest
 PARTS = {
-    "hips": [((0, 0, 1.02), (0.44, 0.26, 0.2), "tunic")],
-    "chest": [((0, 0, 1.33), (0.5, 0.3, 0.4), "steel"), ((0, -0.155, 1.3), (0.16, 0.02, 0.24), "tunic")],
-    "head": [
+    "Hips": [((0, 0, 1.02), (0.44, 0.26, 0.2), "tunic")],
+    "Spine": [((0, 0, 1.33), (0.5, 0.3, 0.4), "steel"), ((0, -0.155, 1.3), (0.16, 0.02, 0.24), "tunic")],
+    "Head": [
         ((0, 0, 1.72), (0.34, 0.32, 0.34), "skin"),
         ((0, 0.02, 1.86), (0.38, 0.36, 0.14), "steel"),
         ((0.07, -0.165, 1.74), (0.05, 0.02, 0.06), "dark"),
         ((-0.07, -0.165, 1.74), (0.05, 0.02, 0.06), "dark"),
     ],
-    "arm.L": [((0.3, 0, 1.36), (0.16, 0.18, 0.32), "steel")],
-    "forearm.L": [((0.3, 0, 1.07), (0.14, 0.16, 0.26), "skin")],
-    "arm.R": [((-0.3, 0, 1.36), (0.16, 0.18, 0.32), "steel")],
-    "forearm.R": [
+    "LeftArm": [((0.3, 0, 1.36), (0.16, 0.18, 0.32), "steel")],
+    "LeftForeArm": [((0.3, 0, 1.07), (0.14, 0.16, 0.26), "skin")],
+    "RightArm": [((-0.3, 0, 1.36), (0.16, 0.18, 0.32), "steel")],
+    "RightForeArm": [
         ((-0.3, 0, 1.07), (0.14, 0.16, 0.26), "skin"),
         ((-0.3, -0.12, 0.95), (0.06, 0.1, 0.06), "gold"),
         ((-0.3, -0.19, 0.95), (0.2, 0.04, 0.04), "gold"),
         ((-0.3, -0.5, 0.95), (0.06, 0.6, 0.03), "blade"),
     ],
-    "thigh.L": [((0.12, 0, 0.72), (0.17, 0.2, 0.44), "tunic")],
-    "shin.L": [((0.12, 0, 0.28), (0.15, 0.18, 0.46), "boots"), ((0.12, -0.05, 0.04), (0.16, 0.28, 0.08), "boots")],
-    "thigh.R": [((-0.12, 0, 0.72), (0.17, 0.2, 0.44), "tunic")],
-    "shin.R": [((-0.12, 0, 0.28), (0.15, 0.18, 0.46), "boots"), ((-0.12, -0.05, 0.04), (0.16, 0.28, 0.08), "boots")],
+    "LeftUpLeg": [((0.12, 0, 0.72), (0.17, 0.2, 0.44), "tunic")],
+    "LeftLeg": [((0.12, 0, 0.28), (0.15, 0.18, 0.46), "boots"), ((0.12, -0.05, 0.04), (0.16, 0.28, 0.08), "boots")],
+    "RightUpLeg": [((-0.12, 0, 0.72), (0.17, 0.2, 0.44), "tunic")],
+    "RightLeg": [((-0.12, 0, 0.28), (0.15, 0.18, 0.46), "boots"), ((-0.12, -0.05, 0.04), (0.16, 0.28, 0.08), "boots")],
 }
 
 
@@ -149,27 +149,27 @@ def animate(armature):
     r = lambda x=0, y=0, z=0, loc=(0, 0, 0): ((x, y, z), loc)  # noqa: E731
 
     key("idle", [
-        (1, {"arm.R": r(x=-10), "forearm.R": r(x=-40), "arm.L": r(x=5)}),
-        (16, {"hips": r(loc=(0, -0.03, 0)), "chest": r(x=3), "arm.R": r(x=-12), "forearm.R": r(x=-44), "arm.L": r(x=8)}),
-        (31, {"arm.R": r(x=-10), "forearm.R": r(x=-40), "arm.L": r(x=5)}),
+        (1, {"RightArm": r(x=-10), "RightForeArm": r(x=-40), "LeftArm": r(x=5)}),
+        (16, {"Hips": r(loc=(0, -0.03, 0)), "Spine": r(x=3), "RightArm": r(x=-12), "RightForeArm": r(x=-44), "LeftArm": r(x=8)}),
+        (31, {"RightArm": r(x=-10), "RightForeArm": r(x=-40), "LeftArm": r(x=5)}),
     ])
 
     def stride(sign, lift):
         return {
-            "hips": r(loc=(0, lift, 0)),
-            "thigh.L": r(x=30 * sign), "shin.L": r(x=-25 if sign < 0 else -5),
-            "thigh.R": r(x=-30 * sign), "shin.R": r(x=-25 if sign > 0 else -5),
-            "arm.L": r(x=-25 * sign), "arm.R": r(x=20 * sign - 10), "forearm.R": r(x=-40),
+            "Hips": r(loc=(0, lift, 0)),
+            "LeftUpLeg": r(x=30 * sign), "LeftLeg": r(x=-25 if sign < 0 else -5),
+            "RightUpLeg": r(x=-30 * sign), "RightLeg": r(x=-25 if sign > 0 else -5),
+            "LeftArm": r(x=-25 * sign), "RightArm": r(x=20 * sign - 10), "RightForeArm": r(x=-40),
         }
 
     key("walk", [(1, stride(1, 0)), (9, stride(0, 0.04)), (17, stride(-1, 0)), (25, stride(0, 0.04)), (33, stride(1, 0))])
 
     key("attack", [
-        (1, {"arm.R": r(x=-10), "forearm.R": r(x=-40)}),
-        (8, {"chest": r(z=-25), "arm.R": r(x=-150, z=-20), "forearm.R": r(x=-30), "thigh.L": r(x=-15)}),
-        (12, {"chest": r(z=30), "arm.R": r(x=-60, z=40), "forearm.R": r(x=-10), "thigh.L": r(x=20), "thigh.R": r(x=-15)}),
-        (18, {"chest": r(z=20), "arm.R": r(x=-40, z=30), "forearm.R": r(x=-20), "thigh.L": r(x=15)}),
-        (27, {"arm.R": r(x=-10), "forearm.R": r(x=-40)}),
+        (1, {"RightArm": r(x=-10), "RightForeArm": r(x=-40)}),
+        (8, {"Spine": r(z=-25), "RightArm": r(x=-150, z=-20), "RightForeArm": r(x=-30), "LeftUpLeg": r(x=-15)}),
+        (12, {"Spine": r(z=30), "RightArm": r(x=-60, z=40), "RightForeArm": r(x=-10), "LeftUpLeg": r(x=20), "RightUpLeg": r(x=-15)}),
+        (18, {"Spine": r(z=20), "RightArm": r(x=-40, z=30), "RightForeArm": r(x=-20), "LeftUpLeg": r(x=15)}),
+        (27, {"RightArm": r(x=-10), "RightForeArm": r(x=-40)}),
     ])
     data.action = None
 
