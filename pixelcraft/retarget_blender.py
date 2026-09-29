@@ -111,7 +111,8 @@ def retarget(source, action, target, name, keep_posture=False, arm_motion=1.0):
         source_limb = to_target @ (src_rest[child][0] - src_rest[role][0])
         target_limb = tgt_rest[child][0] - tgt_rest[role][0]
         corrections[role] = target_limb.rotation_difference(source_limb)
-    height_ratio = tgt_rest["hips"][0].z / max(src_rest["hips"][0].z, 1e-6)
+    # Hip motion scales with hip height above the feet; model origins aren't always at the feet.
+    height_ratio = _hip_height(tgt_rest) / max(_hip_height(src_rest), 1e-6)
 
     target_action = bpy.data.actions.new(name)
     target_action.use_fake_user = True
@@ -157,6 +158,11 @@ def retarget(source, action, target, name, keep_posture=False, arm_motion=1.0):
     return target_action
 
 
+def _hip_height(rest):
+    feet = [rest[r][0].z for r in ("leftfoot", "rightfoot", "lefttoe", "righttoe") if r in rest]
+    return rest["hips"][0].z - (min(feet) if feet else 0.0)
+
+
 def _play(armature, action):
     data = armature.animation_data or armature.animation_data_create()
     for track in data.nla_tracks:
@@ -189,3 +195,64 @@ def _parents_first(armature):
         ordered.append(bone)
         pending.extend(bone.children)
     return ordered
+
+
+def plant_feet(armature, action):
+    """Pin both feet of a humanoid to where they stand on the action's first frame, re-solving
+    each leg (thigh + shin, two-bone IK) on every frame. For attacks and idles on creatures whose
+    legs differ from the source rig's, where retargeted leg motion would make the feet skate."""
+    bones = roles(armature)
+    legs = [(bones[f"{s}upleg"], bones[f"{s}leg"], bones.get(f"{s}foot")) for s in ("left", "right")
+            if f"{s}upleg" in bones and f"{s}leg" in bones]
+    scene = bpy.context.scene
+    _play(armature, action)
+    start, end = (int(round(f)) for f in action.frame_range)
+    scene.frame_set(start)
+    pose = armature.pose.bones
+    # Everything planted comes from the first frame: ankle position, knee bend direction, foot angle.
+    targets = {thigh: pose[shin].tail.copy() for thigh, shin, _ in legs}
+    # Straight legs have no bend direction: knees then bend towards where the character faces.
+    forward = (armature.matrix_world.inverted().to_3x3() @ facing(armature)).normalized()
+    bends = {thigh: _bend(pose[thigh].head, pose[shin].head, pose[shin].tail) or forward for thigh, shin, _ in legs}
+    foot_rotations = {thigh: pose[foot].matrix.to_quaternion() for thigh, _, foot in legs if foot}
+    for frame_number in range(start, end + 1):
+        scene.frame_set(frame_number)
+        for thigh, shin, foot in legs:
+            foot_rotation = foot_rotations.get(thigh)
+            _solve_leg(pose[thigh], pose[shin], targets[thigh], bends[thigh])
+            if foot:
+                matrix = pose[foot].matrix
+                pose[foot].matrix = Matrix.Translation(matrix.to_translation()) @ foot_rotation.to_matrix().to_4x4()
+                bpy.context.view_layer.update()
+            for name in (thigh, shin, foot):
+                if name:
+                    pose[name].keyframe_insert(ROTATION_CHANNEL.get(pose[name].rotation_mode, "rotation_euler"), frame=frame_number)
+
+
+def _bend(hip, knee, ankle):
+    """Direction the knee points away from the hip-ankle line, or None for a straight leg."""
+    along = (ankle - hip).normalized()
+    offset = (knee - hip) - along * (knee - hip).dot(along)
+    return offset.normalized() if offset.length > 1e-4 * (ankle - hip).length else None
+
+
+def _solve_leg(thigh, shin, target, bend):
+    """Bend thigh and shin (armature space) so the ankle reaches `target` with the knee pointing along `bend`."""
+    hip, knee = thigh.head.copy(), shin.head.copy()
+    upper, lower = (knee - hip).length, (shin.tail - knee).length
+    reach = target - hip
+    distance = min(reach.length, (upper + lower) * 0.999)
+    along = reach.normalized()
+    bend = bend - along * bend.dot(along)
+    if bend.length < 1e-6:
+        return
+    a = (upper ** 2 - lower ** 2 + distance ** 2) / (2 * distance)
+    new_knee = hip + along * a + bend.normalized() * max(upper ** 2 - a ** 2, 0) ** 0.5
+    _rotate_bone(thigh, (knee - hip).rotation_difference(new_knee - hip))
+    _rotate_bone(shin, (shin.tail - shin.head).rotation_difference(target - shin.head))
+
+
+def _rotate_bone(pose_bone, rotation):
+    head = pose_bone.head.copy()
+    pose_bone.matrix = Matrix.Translation(head) @ rotation.to_matrix().to_4x4() @ Matrix.Translation(-head) @ pose_bone.matrix
+    bpy.context.view_layer.update()

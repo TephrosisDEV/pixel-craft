@@ -73,3 +73,17 @@ def test_ground_sheet_under_the_feet_is_stripped(tmp_path):
         subprocess.run([sys.executable, str(ROOT / "pixelcraft" / "render_blender.py"), str(config)], check=True)
         canvases.append(json.loads((tmp_path / f"out_{model}" / "render" / "manifest.json").read_text())["canvas"])
     assert canvases[0] == canvases[1]
+
+
+def test_planted_feet_stay_on_the_same_pixels(tmp_path):
+    # The knight's sword attack swings its legs; unplanted, its feet slide about 10 px.
+    subprocess.run([sys.executable, str(ROOT / "examples" / "make_test_knight.py"), str(tmp_path / "knight.blend")], check=True)
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"model": "knight.blend", "actions": ["attack"], "output": "out",
+                                  "render": {"height": 64, "directions": 1, "start_angle": 90, "pitch": 0,
+                                             "frame_step": 2, "plant_feet": ["attack"]}}))
+    subprocess.run([sys.executable, str(ROOT / "pixelcraft" / "render_blender.py"), str(config)], check=True)
+
+    frames = [np.array(Image.open(p))[..., 3] > 0 for p in sorted((tmp_path / "out" / "render" / "attack" / "e").glob("*_albedo.png"))]
+    soles = [np.nonzero(f[-6:-2].any(0))[0] for f in frames]
+    assert len({(s.min(), s.max()) for s in soles}) == 1

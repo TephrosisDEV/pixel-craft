@@ -27,7 +27,7 @@ from mathutils import Matrix, Vector
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from presets import apply as apply_preset  # noqa: E402
 from remesh_blender import remesh  # noqa: E402
-from retarget_blender import facing, is_humanoid, retarget  # noqa: E402
+from retarget_blender import facing, is_humanoid, plant_feet, retarget  # noqa: E402
 
 # Facing angle measured in screen terms: 0 = towards the viewer, 90 = screen right.
 FACING_NAMES = {round(i * 22.5, 1): name for i, name in enumerate(
@@ -52,6 +52,7 @@ DEFAULTS = {
     "remesh": None,
     "colour_smoothing": 4,
     "arm_motion": 1.0,
+    "plant_feet": [],
 }
 
 
@@ -75,6 +76,9 @@ def main():
     if not meshes:
         sys.exit("render: no mesh objects in the scene")
 
+    for name in opts["plant_feet"]:
+        if armature is not None and is_humanoid(armature) and name in bpy.data.actions:
+            plant_feet(armature, bpy.data.actions[name])
     actions = collect_actions(armature, config.get("actions") or list(config.get("animations", {})), opts["frame_step"])
     directions = direction_list(opts["directions"], opts["start_angle"])
     pitch = min(max(float(opts["pitch"]), 0.0), 89.0)

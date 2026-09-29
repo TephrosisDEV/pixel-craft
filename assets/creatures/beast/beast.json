@@ -14,7 +14,10 @@
   "frame_step": 1,
   "arm_motion": {
    "walk": 0.5
-  }
+  },
+  "plant_feet": [
+   "attack"
+  ]
  },
  "preview": {
   "scale": 3

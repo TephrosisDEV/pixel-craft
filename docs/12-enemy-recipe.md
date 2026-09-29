@@ -30,3 +30,4 @@ problem is covered by `"preset": "trellis"`, so a new enemy only needs its own j
 | Limbs stretch into each other | Skinning mixes limbs | Re-rig with `rig_blender.py` |
 | Arms swing absurdly far | Human motion on long arms | `render.arm_motion: {"walk": 0.5}` |
 | Attack unreadable from the side | Twists and sideways motion | Use pitch-only clips like `lunge` |
+| Feet slide during an attack or idle | Leg motion doesn't fit the creature | `render.plant_feet: ["attack"]` |

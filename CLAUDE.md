@@ -57,7 +57,18 @@ Found on the first real enemy (`assets/creatures/beast`). All are on in `"preset
    rotation, per animation (`{"walk": 0.5}`).
 8. **Attack reading badly from the side:** twisting motions don't read in profile. `lunge` uses only
    pitch (x) rotations: wind-up, lunge, follow-through, recover. In the knight rig, +x on
-   Hips/Spine leans forward and -x on arms raises them forward/up.
+   Hips/Spine leans forward, -x on arms raises them forward/up, and thigh -x with shin +x bends
+   the knee forward (check signs numerically on bone positions; small renders are easy to misread).
+9. **Feet skating in attacks:** swinging legs without moving the body slides the feet, and a
+   creature's legs never match the source rig exactly. `plant_feet: ["attack"]` pins both feet to
+   their first-frame position with two-bone IK. The knee bend direction and foot angle must also
+   come from the first frame, or the knee swings around the hip-ankle line. A perfectly straight
+   leg has no bend direction: knees then bend towards the facing direction (without that, the
+   solver silently did nothing on the knight).
+10. **Hip motion vanishing:** retargeting scales hip movement by hip height, which must be measured
+   above the feet: TRELLIS puts the origin mid-body, which shrank the crouch to nothing.
+11. **Debugging deformation:** colour the mesh by dominant bone group (legs red, arms blue) and
+   print bone vs. mesh positions per frame. It separated "bone moves" from "skin moves" in minutes.
 
 Blender gotchas hit along the way:
 - Persistent render data plus material-override switching renders materials black. Keep it off.

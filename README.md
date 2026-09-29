@@ -69,7 +69,8 @@ Paths are relative to the config file. Everything except `model` and `output` is
     "texture_size": null,  // downscale textures to this many px ("auto" = 2x height)
     "remesh": null,        // voxel size as a fraction of height (0.005): fuses fragmented generated meshes
     "colour_smoothing": 4, // vertex colour smoothing passes after remesh
-    "arm_motion": 1.0      // scale arm movement of retargeted clips, or per clip: {"walk": 0.5}
+    "arm_motion": 1.0,     // scale arm movement of retargeted clips, or per clip: {"walk": 0.5}
+    "plant_feet": []       // clips whose feet stay pinned to their first-frame spot (two-bone IK)
   },
   "shade": {
     "normal_blur": 0,                   // smooth normals per frame so light bands don't flicker
