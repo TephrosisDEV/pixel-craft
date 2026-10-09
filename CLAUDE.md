@@ -1,8 +1,10 @@
 # pixel-craft
 
-Turns a concept image into animated pixel-art sprite sheets for a side-view game with many
-enemies: image → 3D (TRELLIS.2) → rig → retargeted animations → Blender render → pixel processing.
-The owner is new to 3D; explain in plain words, show results as MP4 (their phone shows GIFs as stills).
+Turns a concept image into animated pixel-art sprite sheets for a side-view **Godot** game with
+many enemies: image → 3D (TRELLIS.2) → rig → retargeted animations → Blender render → pixel
+processing → Godot sprite. How the pieces fit: `docs/13-one-system.md`.
+The owner is new to 3D and works on a Mac (TRELLIS.2 can't run there; it needs an NVIDIA GPU box).
+Explain in plain words; show results as MP4 (their phone shows GIFs as stills).
 
 ## Layout
 
@@ -12,6 +14,8 @@ The owner is new to 3D; explain in plain words, show results as MP4 (their phone
 | `pixelcraft/retarget_blender.py` | Humanoid retargeting by bone role (Mixamo and Unreal names) |
 | `pixelcraft/remesh_blender.py` | Voxel remesh with baked, smoothed vertex colour and copied skin weights |
 | `pixelcraft/rig_blender.py` | Rig a model from hand-placed joints (stopgap until GPU auto-rigging) |
+| `pixelcraft/export_blender.py` | `pixelcraft glb`: the prepared, animated enemy as one GLB (for GodotPixelRenderer or Godot) |
+| `godot/pixelcraft_sprite.gd` | Godot node: plays `sheet.json`, normal-mapped for 2D lights, origin at the feet |
 | `pixelcraft/process.py`, `shade.py`, `palette.py`, `sheet.py` | Pure Python: toon shading, palette, cleanup, outline, sheets, GIF/MP4 |
 | `pixelcraft/presets.py` | `"preset": "trellis"` bundles every fix below for raw TRELLIS.2 output |
 | `assets/creatures/<name>/` | Per enemy: source `.glb`, `concept.jpg`, `rig.json` (joints), render config |
@@ -25,8 +29,9 @@ The owner is new to 3D; explain in plain words, show results as MP4 (their phone
 pip install -e ".[dev,video]" bpy                   # bpy = Blender as a Python module (5.0)
 PIXELCRAFT_BLENDER=$(which python) pixelcraft run <config.json>   # or point it at blender.exe
 python pixelcraft/rig_blender.py assets/creatures/<name>/rig.json
+PIXELCRAFT_BLENDER=$(which python) pixelcraft glb <config.json>   # prepared enemy -> <output>/<name>.glb
 python tools/flicker.py out/<name>                   # glisten % per animation; the flat knight is ~0.5-0.8
-pytest                                              # render tests skip without bpy
+PIXELCRAFT_GODOT=/path/to/godot pytest              # render tests skip without bpy, Godot test without Godot
 ```
 
 Blender needs `examples/knight.blend` (`python examples/make_test_knight.py examples/knight.blend`)
@@ -69,6 +74,14 @@ Found on the first real enemy (`assets/creatures/beast`). All are on in `"preset
    above the feet: TRELLIS puts the origin mid-body, which shrank the crouch to nothing.
 11. **Debugging deformation:** colour the mesh by dominant bone group (legs red, arms blue) and
    print bone vs. mesh positions per frame. It separated "bone moves" from "skin moves" in minutes.
+12. **Sinking into the floor in Godot:** the sheet pivot was the model origin, mid-body on TRELLIS
+   models. The pivot is now the floor point under the origin, so the Godot node's origin is the feet.
+13. **Dither and inner lines** (`shade.dither`, `outline.inner`, ideas from GodotPixelRenderer)
+   tripled the beast's glisten (1.2% → 3.9%): screen-fixed dither crawls over a moving body and
+   inner lines catch surface bumps. Off by default; try them on smooth models only.
+14. **Never write into the source folder:** a default export path once overwrote the beast's
+   source `.glb` (restored from git). Outputs go under the config's `output` folder, and the GLB
+   export refuses to overwrite the model it loaded.
 
 Blender gotchas hit along the way:
 - Persistent render data plus material-override switching renders materials black. Keep it off.

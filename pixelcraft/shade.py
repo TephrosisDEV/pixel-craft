@@ -7,13 +7,19 @@ import numpy as np
 from .color import hex_to_rgb, linear_to_srgb, srgb_to_linear, srgb_to_oklab, to_uint8
 
 
-def toon(albedo: np.ndarray, normal: np.ndarray, light: list[float], bands: list[dict], normal_blur: int = 0) -> np.ndarray:
+BAYER_4 = (np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) + 0.5) / 16
+
+
+def toon(albedo: np.ndarray, normal: np.ndarray, light: list[float], bands: list[dict], normal_blur: int = 0,
+         dither: float = 0.0) -> np.ndarray:
     """Shade RGBA albedo with hard light bands.
 
     `normal` is the encoded camera-space normal pass. `light` points from the surface towards
     the light in the same space (x right, y up, z towards the viewer). Each band is
     `{"above": lambert threshold, "multiply": "#rrggbb"}`; a pixel takes the first band whose
     threshold its lambert term reaches, and its linear albedo is multiplied by that colour.
+    `dither` (lambert units, e.g. 0.08) mixes neighbouring bands in a 4x4 Bayer pattern within
+    that distance of each threshold, the classic pixel-art shading transition.
     """
     n = normal[..., :3].astype(np.float64) / 255 * 2 - 1
     # Averaging normals with opaque neighbours turns ragged band edges into clean curves that
@@ -28,6 +34,9 @@ def toon(albedo: np.ndarray, normal: np.ndarray, light: list[float], bands: list
         n = np.where(opaque > 0, total / np.maximum(count, 1), n)
     n /= np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-6)
     lambert = n @ (np.asarray(light, dtype=np.float64) / np.linalg.norm(light))
+    if dither:
+        height, width = lambert.shape
+        lambert = lambert + (np.tile(BAYER_4, (height // 4 + 1, width // 4 + 1))[:height, :width] - 0.5) * 2 * dither
 
     ordered = sorted(bands, key=lambda b: b["above"], reverse=True)
     multiply = np.tile(srgb_to_linear(hex_to_rgb(ordered[-1]["multiply"])), (*lambert.shape, 1))
@@ -103,4 +112,26 @@ def dim_highlights(image: np.ndarray, margin: float = 0.15, radius: int = 3) -> 
         distance = np.abs(window[:, y, x] - median[y, x])
         dy, dx = offsets[int(np.nanargmin(distance))]
         result[y, x, :3] = colours[y + radius + dy, x + radius + dx]
+    return result
+
+
+def inner_lines(image: np.ndarray, normal: np.ndarray, angle: float, colour: np.ndarray) -> np.ndarray:
+    """Draw lines inside the silhouette where the surface turns by more than `angle` degrees between
+    neighbouring pixels (an arm in front of the body, a deep crease). The line goes on the side
+    facing further away from the viewer, so it reads as the edge of the nearer shape."""
+    n = normal[..., :3].astype(np.float64) / 255 * 2 - 1
+    n /= np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-6)
+    opaque = (image[..., 3] > 0) & (normal[..., 3] > 0)
+    limit = np.cos(np.radians(angle))
+    line = np.zeros(opaque.shape, dtype=bool)
+    for axis in (0, 1):
+        here = [slice(None)] * 2
+        there = [slice(None)] * 2
+        here[axis], there[axis] = slice(None, -1), slice(1, None)
+        a, b = n[tuple(here)], n[tuple(there)]
+        crease = opaque[tuple(here)] & opaque[tuple(there)] & ((a * b).sum(-1) < limit)
+        line[tuple(here)] |= crease & (a[..., 2] <= b[..., 2])
+        line[tuple(there)] |= crease & (b[..., 2] < a[..., 2])
+    result = image.copy()
+    result[line, :3] = colour
     return result

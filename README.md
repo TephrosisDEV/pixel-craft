@@ -26,6 +26,9 @@ pixelcraft run examples/knight.json
 
 `run` is `render` (Blender, writes `out/<name>/render/`) followed by `process` (pure Python). They
 can be run separately, so shading, palette and outline can be retuned without re-rendering.
+`pixelcraft glb <config>` instead exports the prepared enemy (cleaned, rigged, animations
+retargeted, feet planted) as `out/<name>/<name>.glb`, for trying looks live in
+[GodotPixelRenderer](https://github.com/bukkbeek/GodotPixelRenderer) or for use in Godot directly.
 Blender is found as `blender` on `PATH`, or set `PIXELCRAFT_BLENDER` to the binary. That can also be
 a Python that has the `bpy` module (`pip install bpy`).
 
@@ -37,6 +40,14 @@ Output in `out/<name>/`:
 | `albedo.png`, `normal.png` | Same layout, unshaded colour and camera-space normals, for toon lighting in the engine (Dead Cells style) |
 | `palette.hex` | The shared palette |
 | `previews/<action>.gif`, `.mp4` | Every direction of an animation side by side, scaled up. The MP4 (for phones that show GIFs as stills) needs `pip install -e ".[video]"` |
+
+### In Godot
+
+Copy `godot/pixelcraft_sprite.gd` into the game, add a `PixelcraftSprite` node and set its
+`sheet_json` to an exported `sheet.json` (with `sheet.png` and `normal.png` beside it). It builds
+the animations (`walk_e`, `attack_e`, …; flip with `flip_h`), loops all but `play_once` ones
+(attack, death, hurt), puts the node origin at the feet, and attaches the normal map so
+`PointLight2D` and other 2D lights shade the sprite.
 
 ### Config
 
@@ -70,10 +81,12 @@ Paths are relative to the config file. Everything except `model` and `output` is
     "remesh": null,        // voxel size as a fraction of height (0.005): fuses fragmented generated meshes
     "colour_smoothing": 4, // vertex colour smoothing passes after remesh
     "arm_motion": 1.0,     // scale arm movement of retargeted clips, or per clip: {"walk": 0.5}
-    "plant_feet": []       // clips whose feet stay pinned to their first-frame spot (two-bone IK)
+    "plant_feet": [],      // clips whose feet stay pinned to their first-frame spot (two-bone IK)
+    "export_glb": null     // also write the prepared enemy as a GLB at this path
   },
   "shade": {
     "normal_blur": 0,                   // smooth normals per frame so light bands don't flicker
+    "dither": 0.0,                      // Bayer-dither neighbouring light bands this close to a threshold (e.g. 0.08)
     "light": [-0.5, 0.55, 0.65],        // towards the light, in screen space: x right, y up, z to viewer
     "bands": [                          // hard light bands; first one whose threshold is reached wins
       {"above": 0.35, "multiply": "#ffffff"},
@@ -84,7 +97,8 @@ Paths are relative to the config file. Everything except `model` and `output` is
   "palette": {"max_colors": 24, "min_share": 0.002, "file": null}, // drop colours under 0.2% of pixels; file forces a .hex/.gpl/image palette
   "cleanup": {"despeckle": false,               // recolour isolated pixels: helps detailed textures, eats 1px eyes
               "highlights": false},             // recolour small spots much lighter than their surroundings
-  "outline": {"mode": "outer", "color": "auto"}, // outer | inner | none; auto = darkest palette colour
+  "outline": {"mode": "outer", "color": "auto",  // outer | inner | none; auto = darkest palette colour
+              "inner": null},                   // degrees: also draw lines where the surface turns this sharply
   "preview": {"scale": 4, "background": "#22222a"}
 }
 ```
@@ -102,10 +116,10 @@ every action is dropped.
 
 ```sh
 pip install -e ".[dev]" bpy
-pytest
+PIXELCRAFT_GODOT=/path/to/godot pytest
 ```
 
-The render test is skipped when `bpy` isn't installed.
+Render tests are skipped when `bpy` isn't installed, the Godot test when `PIXELCRAFT_GODOT` isn't set.
 
 ## How PixelLab works (the short version)
 
@@ -152,7 +166,8 @@ synthetically from 3D models through a pixel-art shader. See
 10. [Automating image → rigged, animated 3D](docs/10-image-to-3d-automation.md)
 11. [Windows setup for local image → 3D](docs/11-windows-setup.md)
 12. [Recipe: a new enemy](docs/12-enemy-recipe.md)
-13. [Sources](docs/sources.md)
+13. [One system: how TRELLIS, pixelcraft and Godot fit together](docs/13-one-system.md)
+14. [Sources](docs/sources.md)
 
 ## Research notes
 

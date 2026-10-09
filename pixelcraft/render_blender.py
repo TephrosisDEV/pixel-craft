@@ -25,6 +25,7 @@ import bmesh  # noqa: I001  (only importable once bpy is loaded)
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from export_blender import export_glb  # noqa: E402
 from presets import apply as apply_preset  # noqa: E402
 from remesh_blender import remesh  # noqa: E402
 from retarget_blender import facing, is_humanoid, plant_feet, retarget  # noqa: E402
@@ -53,6 +54,7 @@ DEFAULTS = {
     "colour_smoothing": 4,
     "arm_motion": 1.0,
     "plant_feet": [],
+    "export_glb": None,
 }
 
 
@@ -97,9 +99,19 @@ def main():
             voxel = (max(zs) - min(zs)) * opts["remesh"] / max(obj.matrix_world.to_scale())
             count = remesh(obj, voxel, opts["colour_smoothing"], opts["texture_colors"] == "linear")
             print(f"render: remeshed {obj.name} to {count} vertices")
+    if opts["export_glb"] or "--glb-only" in argv:
+        # Default lives in the output folder, so it can never overwrite the source model.
+        glb = (base / opts["export_glb"] if opts["export_glb"] else out_dir.parent / f"{out_dir.parent.name}.glb").resolve()
+        if glb == (base / config["model"]).resolve():
+            sys.exit(f"render: refusing to overwrite the source model {glb}")
+        export_glb(glb, meshes, armature)
+        print(f"render: exported {glb}")
+        if "--glb-only" in argv:
+            return
     normal_material = make_normal_material()
 
-    unit = world_height(scene, armature, meshes, actions) / opts["height"]
+    model_height, floor = world_extent(scene, armature, meshes, actions)
+    unit = model_height / opts["height"]
     front = front_angle(armature, opts["front_axis"])
     bases = {d["name"]: camera_basis(d["angle"], front, pitch) for d in directions}
     x0, x1, y0, y1 = canvas_bounds(scene, armature, meshes, actions, bases.values(), unit, opts["padding"])
@@ -125,7 +137,8 @@ def main():
 
     manifest = {
         "canvas": [width, height],
-        "pivot": [-x0, y1],
+        # Under the origin at floor level: where the feet stand, even when the model's origin is mid-body.
+        "pivot": [-x0, y1 - round(floor * math.cos(math.radians(pitch)) / unit)],
         "unit": unit,
         "pitch": pitch,
         "fps": scene.render.fps / opts["frame_step"],
@@ -309,10 +322,10 @@ def sampled_corners(scene, armature, meshes, actions):
                     yield evaluated.matrix_world @ Vector(corner)
 
 
-def world_height(scene, armature, meshes, actions):
-    """Model height at the first frame of the first action: the size that `height` pixels maps to."""
+def world_extent(scene, armature, meshes, actions):
+    """Model height (the size `height` pixels maps to) and floor (lowest point) at the first frame of the first action."""
     zs = [c.z for c in sampled_corners(scene, armature, meshes, [{**actions[0], "frames": actions[0]["frames"][:1]}])]
-    return max(zs) - min(zs)
+    return max(zs) - min(zs), min(zs)
 
 
 def canvas_bounds(scene, armature, meshes, actions, bases, unit, padding):

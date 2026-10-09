@@ -9,7 +9,7 @@ from PIL import Image
 from . import palette as palettes
 from .presets import apply as apply_preset
 from .color import hex_to_rgb, to_uint8
-from .shade import despeckle, dim_highlights, outline, toon
+from .shade import despeckle, dim_highlights, inner_lines, outline, toon
 from .sheet import aseprite_json, pack, preview_frames, write_gif, write_mp4
 
 DEFAULTS = {
@@ -21,10 +21,11 @@ DEFAULTS = {
             {"above": -1.0, "multiply": "#6f6a9a"},
         ],
         "normal_blur": 0,
+        "dither": 0.0,
     },
     "palette": {"max_colors": 24, "min_share": 0.002, "file": None},
     "cleanup": {"despeckle": False, "highlights": False},
-    "outline": {"mode": "outer", "color": "auto"},
+    "outline": {"mode": "outer", "color": "auto", "inner": None},
     "preview": {"scale": 4, "background": "#22222a"},
 }
 
@@ -47,7 +48,8 @@ def process(config_path: Path) -> str:
         for direction in manifest["directions"]
     }
     shaded = {
-        name: [toon(albedo, normal, opts["shade"]["light"], opts["shade"]["bands"], opts["shade"]["normal_blur"]) for albedo, normal in frames]
+        name: [toon(albedo, normal, opts["shade"]["light"], opts["shade"]["bands"], opts["shade"]["normal_blur"],
+             opts["shade"]["dither"]) for albedo, normal in frames]
         for name, frames in passes.items()
     }
 
@@ -63,8 +65,13 @@ def process(config_path: Path) -> str:
         return despeckle(frame) if opts["cleanup"]["despeckle"] else frame
 
     line_colour = palettes.darkest(colours) if opts["outline"]["color"] == "auto" else to_uint8(hex_to_rgb(opts["outline"]["color"]))
+    def lines(frame, normal):
+        if opts["outline"]["inner"]:
+            frame = inner_lines(frame, normal, opts["outline"]["inner"], line_colour)
+        return outline(frame, opts["outline"]["mode"], line_colour)
+
     final = {
-        name: [outline(clean(palettes.apply(frame, colours)), opts["outline"]["mode"], line_colour) for frame in frames]
+        name: [lines(clean(palettes.apply(frame, colours)), normal) for frame, (_, normal) in zip(frames, passes[name])]
         for name, frames in shaded.items()
     }
 

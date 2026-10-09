@@ -87,3 +87,38 @@ def test_planted_feet_stay_on_the_same_pixels(tmp_path):
     frames = [np.array(Image.open(p))[..., 3] > 0 for p in sorted((tmp_path / "out" / "render" / "attack" / "e").glob("*_albedo.png"))]
     soles = [np.nonzero(f[-6:-2].any(0))[0] for f in frames]
     assert len({(s.min(), s.max()) for s in soles}) == 1
+
+
+def test_pivot_sits_under_the_feet_wherever_the_origin_is(tmp_path):
+    subprocess.run([sys.executable, str(ROOT / "examples" / "make_test_knight.py"), str(tmp_path / "knight.blend")], check=True)
+    raise_model = (  # like TRELLIS output: the origin is no longer at the feet
+        "import bpy, sys; bpy.ops.wm.open_mainfile(filepath=sys.argv[1]); "
+        "[setattr(o.location, 'z', o.location.z + 0.7) for o in bpy.data.objects if o.parent is None]; "
+        "bpy.ops.wm.save_as_mainfile(filepath=sys.argv[2])"
+    )
+    subprocess.run([sys.executable, "-c", raise_model, str(tmp_path / "knight.blend"), str(tmp_path / "raised.blend")], check=True)
+    for model in ("knight.blend", "raised.blend"):
+        config = tmp_path / f"{model}.json"
+        config.write_text(json.dumps({"model": model, "actions": ["idle"], "output": f"out_{model}",
+                                      "render": {"height": 48, "directions": 1, "start_angle": 90, "pitch": 0, "frame_step": 8}}))
+        subprocess.run([sys.executable, str(ROOT / "pixelcraft" / "render_blender.py"), str(config)], check=True)
+        render = tmp_path / f"out_{model}" / "render"
+        pivot = json.loads((render / "manifest.json").read_text())["pivot"]
+        frame = np.array(Image.open(render / "idle" / "e" / "0000_albedo.png"))[..., 3] > 0
+        assert pivot[1] == np.nonzero(frame.any(1))[0].max() + 1
+
+
+def test_glb_export_carries_mesh_skeleton_and_actions(tmp_path):
+    subprocess.run([sys.executable, str(ROOT / "examples" / "make_test_knight.py"), str(tmp_path / "knight.blend")], check=True)
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"model": "knight.blend", "output": "out/knight", "render": {"height": 32, "directions": 1}}))
+    subprocess.run([sys.executable, str(ROOT / "pixelcraft" / "render_blender.py"), str(config), "--glb-only"], check=True)
+    assert not (tmp_path / "out" / "knight" / "render").exists()
+
+    check = (
+        "import bpy, sys; bpy.ops.wm.read_factory_settings(use_empty=True); bpy.ops.import_scene.gltf(filepath=sys.argv[1]); "
+        "print(sorted(a.name for a in bpy.data.actions), sorted({o.type for o in bpy.data.objects}))"
+    )
+    result = subprocess.run([sys.executable, "-c", check, str(tmp_path / "out" / "knight" / "knight.glb")],
+                            capture_output=True, text=True, check=True)
+    assert "['attack', 'idle', 'lunge', 'walk'] ['ARMATURE', 'MESH']" in result.stdout

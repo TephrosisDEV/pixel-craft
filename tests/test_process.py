@@ -1,7 +1,7 @@
 import numpy as np
 
 from pixelcraft import palette
-from pixelcraft.shade import despeckle, dim_highlights, outline, toon
+from pixelcraft.shade import despeckle, dim_highlights, inner_lines, outline, toon
 from pixelcraft.sheet import aseprite_json
 
 BANDS = [
@@ -106,3 +106,24 @@ def test_presets_fill_in_under_the_configs_own_values():
     assert config["render"]["strip_ground"] is True
     assert config["cleanup"]["highlights"] is True
     assert apply({"render": {"height": 64}}) == {"render": {"height": 64}}
+
+
+def test_dither_mixes_bands_only_near_the_threshold():
+    albedo = np.full((8, 8, 4), 200, dtype=np.uint8)
+    lit, shadow = encoded_normal(0, 0, 1), encoded_normal(0, 0, -1)
+    near = np.tile(encoded_normal(0, 0.6, 0.8), (8, 8, 1))  # lambert 0.8: right on the threshold
+    light = [0, 0, 1]
+    bands = [{"above": 0.8, "multiply": "#ffffff"}, {"above": -1.0, "multiply": "#808080"}]
+    mixed = toon(albedo, near, light, bands, dither=0.1)
+    assert len({tuple(p) for p in mixed[..., :3].reshape(-1, 3)}) == 2
+    assert len({tuple(p) for p in toon(albedo, np.tile(lit, (8, 8, 1)), light, bands, dither=0.1)[..., :3].reshape(-1, 3)}) == 1
+    assert len({tuple(p) for p in toon(albedo, np.tile(shadow, (8, 8, 1)), light, bands, dither=0.1)[..., :3].reshape(-1, 3)}) == 1
+
+
+def test_inner_lines_mark_creases_but_not_flat_surfaces():
+    image = np.full((4, 6, 4), [100, 100, 100, 255], dtype=np.uint8)
+    normal = np.tile(encoded_normal(0, 0, 1), (4, 6, 1))
+    normal[:, 3:] = encoded_normal(0.9, 0, 0.43)
+    lined = inner_lines(image, normal, 45, np.array([0, 0, 0], dtype=np.uint8))
+    assert lined[:, 3].tolist() == [[0, 0, 0, 255]] * 4
+    assert (lined[:, :3, :3] == 100).all() and (lined[:, 4:, :3] == 100).all()
