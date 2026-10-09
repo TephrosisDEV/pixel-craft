@@ -1,0 +1,14 @@
+{
+ "preset": "trellis",
+ "model": "beast_rigged.blend",
+ "animations": {
+  "walk": "../../animations/KayKit_Skeleton.glb#Walking_A",
+  "chop": "../../animations/KayKit_Skeleton.glb#2H_Melee_Attack_Chop",
+  "hit": "../../animations/KayKit_Skeleton.glb#Hit_A",
+  "death": "../../animations/KayKit_Skeleton.glb#Death_A"
+ },
+ "output": "../../../out/beast_kaykit",
+ "render": {"height": 140, "directions": 1, "start_angle": 90, "pitch": 0, "frame_step": 1,
+            "arm_motion": {"walk": 0.5}, "plant_feet": ["chop", "hit"]},
+ "preview": {"scale": 3}
+}

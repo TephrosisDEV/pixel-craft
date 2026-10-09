@@ -122,3 +122,18 @@ def test_glb_export_carries_mesh_skeleton_and_actions(tmp_path):
     result = subprocess.run([sys.executable, "-c", check, str(tmp_path / "out" / "knight" / "knight.glb")],
                             capture_output=True, text=True, check=True)
     assert "['attack', 'idle', 'lunge', 'walk'] ['ARMATURE', 'MESH']" in result.stdout
+
+
+def test_kaykit_skeleton_is_recognised_as_humanoid():
+    # KayKit's rig (the animations GodotPixelRenderer ships) names legs upperleg/lowerleg and has a chest.
+    bones = ["hips", "spine", "chest", "head"] + [f"{b}.{s}" for s in "lr" for b in
+                                                  ("upperarm", "lowerarm", "hand", "upperleg", "lowerleg", "foot", "toes")]
+    check = (
+        "import bpy, sys; sys.path.insert(0, sys.argv[1]); from retarget_blender import roles, is_humanoid; "
+        "bpy.ops.wm.read_factory_settings(use_empty=True); bpy.ops.object.armature_add(); arm = bpy.context.object; "
+        "bpy.ops.object.mode_set(mode='EDIT'); arm.data.edit_bones.remove(arm.data.edit_bones[0]); "
+        "[setattr(arm.data.edit_bones.new(n), 'tail', (0, 0, 1)) for n in sys.argv[2:]]; "
+        "bpy.ops.object.mode_set(mode='OBJECT'); print(len(roles(arm)), is_humanoid(arm))"
+    )
+    result = subprocess.run([sys.executable, "-c", check, str(ROOT / "pixelcraft"), *bones], capture_output=True, text=True, check=True)
+    assert "18 True" in result.stdout

@@ -36,7 +36,9 @@ PIXELCRAFT_GODOT=/path/to/godot pytest              # render tests skip without 
 
 Blender needs `examples/knight.blend` (`python examples/make_test_knight.py examples/knight.blend`)
 for the `lunge` clip, and `assets/animations/Soldier.glb` (three.js repo,
-`examples/models/gltf/Soldier.glb`, git-ignored) for the walk.
+`examples/models/gltf/Soldier.glb`, git-ignored) for the walk. The main animation library is
+`assets/animations/KayKit_Skeleton.glb` (git-ignored; GodotPixelRenderer's
+`Sample/Skeleton_Minion.glb`, KayKit CC0, 95 clips: walk, attacks, hit, death, dodge, spells, spawn).
 
 ## Lessons from real models (each is a setting; keep them)
 

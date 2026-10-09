@@ -44,6 +44,30 @@ step, cheapest first:
 The demo app's API has two steps, `image_to_3d` (image + seed + quality settings) then
 `extract_glb` (face count + texture size); a Gradio client can call both.
 
+## What we take from GodotPixelRenderer
+
+- **Its animation library.** The sample skeleton carries KayKit's 95 CC0 clips. pixelcraft
+  retargets them onto any humanoid enemy (`assets/creatures/beast/beast_kaykit.json`), so the clips
+  you can play in its viewer are the ones the pipeline renders.
+- **Its look controls**, as config: camera side/position (`start_angle`, `pitch`, `height`),
+  colour steps and palette remap (`palette.max_colors`, `palette.file`), dithering and edges
+  (`shade.dither`, `outline.inner`). Its three-light rig (key, fill, rim) has no counterpart: the
+  sheet's normal map lets Godot's 2D lights do that at runtime.
+
+## The other route: image models plus pixel snapping
+
+The "Stop Generating Fake Pixel Art" workflow (GPT Image 2 or Nano Banana 2) skips 3D: generate a
+1024² chroma-green anchor, pixel-snap it
+([Sprite Fusion Pixel Snapper](https://spritefusion.com/pixel-snapper), open source), scale back up
+with nearest neighbour, generate a 2048×1536 pose board per animation from the anchor plus a
+checkered pixel grid, then cut frames by chroma key and bounding box, pick frames, snap each, align
+them by hand, key out the background and pack.
+
+It fixes three problems image models create: off-grid "mixels", frames bleeding into each other,
+and frames drifting. The 3D route doesn't have them: every frame is rendered on the pixel grid,
+into its own cell, from the same pivot. Its author also says image models can't do walk cycles.
+Worth trying for enemies 3D can't rig (slimes, swarms, ghosts), with Gemini as the image model.
+
 ## Planned command
 
 ```

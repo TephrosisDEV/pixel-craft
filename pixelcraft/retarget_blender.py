@@ -1,8 +1,8 @@
 """Retarget an animation from one humanoid armature onto another, inside Blender.
 
-Bones are matched by role (hips, spine, arms, legs…) across Mixamo and Unreal-style names, so
-Mixamo downloads and CC0 packs such as Quaternius' Universal Animation Library work on any rig
-with either naming. Each source bone's rotation away from its rest pose is replayed in world space
+Bones are matched by role (hips, spine, arms, legs…) across Mixamo, Unreal-style and KayKit names,
+so Mixamo downloads and CC0 packs such as Quaternius' Universal Animation Library and KayKit's
+Character Animations work on any rig with one of those namings. Each source bone's rotation away from its rest pose is replayed in world space
 on the target, after bending the target's rest limbs onto the source's (T vs A pose), so rigs
 whose facing, bone axes or rest poses differ still line up.
 Fingers and other unmatched bones stay at rest; they don't show at sprite size.
@@ -17,7 +17,7 @@ from mathutils import Matrix, Quaternion, Vector
 ROLES = {
     "hips": ["hips", "pelvis"],
     "spine": ["spine", "spine01"],
-    "spine1": ["spine1", "spine02"],
+    "spine1": ["spine1", "spine02", "chest"],
     "spine2": ["spine2", "spine03"],
     "neck": ["neck", "neck01"],
     "head": ["head"],
@@ -28,10 +28,10 @@ for side, s in (("left", "l"), ("right", "r")):
         f"{side}arm": [f"{side}arm", f"upperarm{s}"],
         f"{side}forearm": [f"{side}forearm", f"lowerarm{s}"],
         f"{side}hand": [f"{side}hand", f"hand{s}"],
-        f"{side}upleg": [f"{side}upleg", f"thigh{s}"],
-        f"{side}leg": [f"{side}leg", f"calf{s}"],
+        f"{side}upleg": [f"{side}upleg", f"thigh{s}", f"upperleg{s}"],
+        f"{side}leg": [f"{side}leg", f"calf{s}", f"lowerleg{s}"],
         f"{side}foot": [f"{side}foot", f"foot{s}"],
-        f"{side}toe": [f"{side}toebase", f"ball{s}"],
+        f"{side}toe": [f"{side}toebase", f"ball{s}", f"toes{s}"],
     })
 REQUIRED = ("hips", "head", "leftupleg", "rightupleg")
 ROTATION_CHANNEL = {"QUATERNION": "rotation_quaternion", "AXIS_ANGLE": "rotation_axis_angle"}

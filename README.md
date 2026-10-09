@@ -104,9 +104,16 @@ Paths are relative to the config file. Everything except `model` and `output` is
 ```
 
 **Retargeting.** Humanoid skeletons are matched by bone role, with Mixamo names (`mixamorig:LeftArm`,
-`LeftArm`) and Unreal-style names (`upperarm_l`, `thigh_r`) both recognised. So Mixamo downloads and
-CC0 packs such as Quaternius' Universal Animation Library play on any humanoid model, whatever its
-rest pose (T or A), facing or proportions. Fingers aren't retargeted; they don't show at sprite size.
+`LeftArm`), Unreal-style names (`upperarm_l`, `thigh_r`) and KayKit names (`upperleg.l`, `chest`)
+recognised. So Mixamo downloads and CC0 packs such as Quaternius' Universal Animation Library and
+KayKit's Character Animations play on any humanoid model, whatever its rest pose (T or A), facing or
+proportions. Fingers aren't retargeted; they don't show at sprite size.
+
+The quickest library: GodotPixelRenderer's sample skeleton
+([`Sample/Skeleton_Minion.glb`](https://github.com/bukkbeek/GodotPixelRenderer/tree/main/Sample),
+KayKit, CC0) carries 95 clips: walks, runs, 1H/2H/unarmed attacks, hits, deaths, dodges, spellcasts,
+spawns. Save it as `assets/animations/KayKit_Skeleton.glb` and pick clips by name, as
+`assets/creatures/beast/beast_kaykit.json` does (`"chop": ".../KayKit_Skeleton.glb#2H_Melee_Attack_Chop"`).
 
 Animations should be exported **in place** (Mixamo has a checkbox for it), otherwise the character
 walks out of the fixed canvas. Loops are expected to end on their first pose; the last frame of
